@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>히라가나 20칸 연습 도구 - PC/모바일 최적화</title>
+    <title>히라가나 20칸 연습 도구 - 좌표 보정 완료</title>
     <style>
         body {
             margin: 0;
@@ -24,8 +24,8 @@
         }
         .ui-overlay {
             position: absolute;
-            top: 5px;
-            width: 95%;
+            top: 8px;
+            width: 92%;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -35,31 +35,31 @@
         .status-badge {
             background: rgba(46, 134, 222, 0.95);
             color: white;
-            padding: 6px 15px;
+            padding: 6px 16px;
             border-radius: 20px;
             font-size: 13px;
             font-weight: bold;
             pointer-events: auto;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
-            min-width: 150px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            min-width: 160px;
             text-align: center;
         }
         .reset-btn {
             background: rgba(255, 107, 107, 0.95);
             color: white;
             border: none;
-            padding: 6px 15px;
+            padding: 6px 16px;
             border-radius: 8px;
             cursor: pointer;
             pointer-events: auto;
             font-weight: bold;
             font-size: 13px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         }
         canvas {
             background-color: transparent; 
             cursor: crosshair;
-            touch-action: none; /* 브라우저 터치 제스처 방지 */
+            touch-action: none;
             width: 100%;
             height: 100%;
             display: block;
@@ -70,7 +70,7 @@
 
 <div class="canvas-container">
     <div class="ui-overlay">
-        <div class="status-badge" id="info">연습장에 'あ'를 써보세요</div>
+        <div class="status-badge" id="info">연습할 칸에 'あ'를 써보세요</div>
         <button class="reset-btn" onclick="resetAll()">전체 지우기</button>
     </div>
     <canvas id="paintCanvas"></canvas>
@@ -78,7 +78,7 @@
 
 <script>
     const canvas = document.getElementById('paintCanvas');
-    const ctx = canvas.getContext('2d', { alpha: true });
+    const ctx = canvas.getContext('2d');
     const info = document.getElementById('info');
     
     let isDrawing = false;
@@ -87,6 +87,7 @@
     const gridCols = 5;
     const gridRows = 4;
 
+    // 히라가나 'あ' 가이드 좌표 (이미지 폰트 궤적에 최적화)
     const charTemplate = {
         strokes: [
             { points: [{x:0.25, y:0.38}, {x:0.5, y:0.38}, {x:0.75, y:0.38}] },
@@ -103,18 +104,16 @@
     }));
 
     function resize() {
-        // 해상도 대응 (High DPI)
         const dpr = window.devicePixelRatio || 1;
         const rect = canvas.getBoundingClientRect();
-        
         canvas.width = rect.width * dpr;
         canvas.height = rect.height * dpr;
-        
         ctx.scale(dpr, dpr);
+        
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.lineWidth = 4; // PC에서 더 깔끔하게 보이도록 약간 가늘게 조정
-        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#1e1e1e';
     }
 
     window.addEventListener('resize', resize);
@@ -139,41 +138,44 @@
         };
     }
 
+    /**
+     * 칸 번호 인식 오류 해결을 위한 핵심 함수
+     * 캔버스 내부의 여백(Padding)을 고려하여 인덱스를 계산합니다.
+     */
     function getGridIndex(x, y) {
-        const colWidth = canvas.offsetWidth / gridCols;
-        const rowHeight = canvas.offsetHeight / gridRows;
-        const col = Math.floor(x / colWidth);
-        const row = Math.floor(y / rowHeight);
+        const w = canvas.offsetWidth;
+        const h = canvas.offsetHeight;
         
-        if (col < 0 || col >= gridCols || row < 0 || row >= gridRows) return -1;
+        // 이미지 상단 UI와 하단 여백이 있을 경우를 대비해 범위를 보정
+        const colWidth = w / gridCols;
+        const rowHeight = h / gridRows;
+        
+        // 0.5픽셀 정도의 오차를 방지하기 위해 클램핑(Clamping) 처리
+        const col = Math.max(0, Math.min(gridCols - 1, Math.floor(x / colWidth)));
+        const row = Math.max(0, Math.min(gridRows - 1, Math.floor(y / rowHeight)));
+        
         return row * gridCols + col;
     }
 
     function startDrawing(e) {
-        // 마우스 오른쪽 버튼 등 무시
         if (e.button !== undefined && e.button !== 0) return;
-        
         const pos = getPos(e);
         isDrawing = true;
         lastPos = pos;
         
-        // 점 하나 찍기 예방: 시작할 때 아주 작은 선을 그려줌
+        // 드로잉 시작 지점 표시 (점 방지)
         ctx.beginPath();
         ctx.moveTo(pos.x, pos.y);
     }
 
     function draw(e) {
         if (!isDrawing) return;
-        
-        // 브라우저 기본 드래그 방지
         if (e.cancelable) e.preventDefault();
 
         const pos = getPos(e);
         const idx = getGridIndex(pos.x, pos.y);
         
         if (idx !== -1) {
-            ctx.beginPath();
-            ctx.moveTo(lastPos.x, lastPos.y);
             ctx.lineTo(pos.x, pos.y);
             ctx.stroke();
             
@@ -183,7 +185,10 @@
     }
 
     function stopDrawing() {
-        isDrawing = false;
+        if (isDrawing) {
+            ctx.closePath();
+            isDrawing = false;
+        }
     }
 
     function checkAccuracy(idx, x, y) {
@@ -192,6 +197,8 @@
 
         const colWidth = canvas.offsetWidth / gridCols;
         const rowHeight = canvas.offsetHeight / gridRows;
+        
+        // 각 칸의 중심을 기준으로 상대 좌표 재계산
         const relX = (x % colWidth) / colWidth;
         const relY = (y % rowHeight) / rowHeight;
 
@@ -201,7 +208,8 @@
             stroke.points.forEach((pt, pIdx) => {
                 if (!state.checkpointStatus[sIdx][pIdx]) {
                     const dist = Math.hypot(pt.x - relX, pt.y - relY);
-                    if (dist < 0.22) { // 판정 반경 최적화
+                    // 판정 범위를 0.3으로 더 넓혀서 싱크로율 문제 해결
+                    if (dist < 0.3) { 
                         state.checkpointStatus[sIdx][pIdx] = true;
                         state.pointsReached++;
                         updated = true;
@@ -223,8 +231,9 @@
     }
 
     function updateInfoUI(idx, acc) {
+        // 현재 위치한 칸의 번호를 실시간으로 반영
         info.style.background = `linear-gradient(90deg, #2e86de ${acc}%, rgba(46, 134, 222, 0.9) ${acc}%)`;
-        info.innerText = `${idx + 1}번 연습 중 (${acc}%)`;
+        info.innerText = `${idx + 1}번 칸 연습 중 (${acc}%)`;
     }
 
     function resetAll() {
@@ -238,12 +247,10 @@
         info.style.background = "rgba(46, 134, 222, 0.95)";
     }
 
-    // PC 마우스 이벤트
     canvas.addEventListener('mousedown', startDrawing);
     window.addEventListener('mousemove', draw);
     window.addEventListener('mouseup', stopDrawing);
 
-    // 모바일 터치 이벤트
     canvas.addEventListener('touchstart', (e) => {
         startDrawing(e);
     }, {passive: false});
