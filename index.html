@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>히라가나 10칸 연습 도구</title>
+    <title>히라가나 20칸 연습 도구</title>
     <style>
         body {
             margin: 0;
@@ -20,11 +20,10 @@
             flex-direction: column;
             align-items: center;
         }
-        /* UI 레이아웃을 상단으로 이동 */
         .ui-overlay {
             position: absolute;
-            top: 10px; /* 위로 올림 */
-            width: 90%;
+            top: 5px;
+            width: 95%;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -36,7 +35,7 @@
             color: white;
             padding: 4px 12px;
             border-radius: 15px;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: bold;
             pointer-events: auto;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
@@ -50,7 +49,7 @@
             cursor: pointer;
             pointer-events: auto;
             font-weight: bold;
-            font-size: 13px;
+            font-size: 12px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
         canvas {
@@ -58,19 +57,17 @@
             cursor: crosshair;
             touch-action: none;
             width: 100%;
-            height: 100%; /* 전체 영역 사용 */
+            height: 100%;
         }
     </style>
 </head>
 <body>
 
 <div class="canvas-container">
-    <!-- UI가 위로 올라왔습니다 -->
     <div class="ui-overlay">
-        <div class="status-badge" id="info">연습장에 써보세요</div>
+        <div class="status-badge" id="info">연습할 칸에 써보세요 (총 20칸)</div>
         <button class="reset-btn" onclick="resetAll()">전체 지우기</button>
     </div>
-    
     <canvas id="paintCanvas"></canvas>
 </div>
 
@@ -81,23 +78,23 @@
     
     let isDrawing = false;
     
-    // 5열 2행 격자 설정
+    // 이미지에 맞춘 5열 4행 설정 (총 20칸)
     const gridCols = 5;
-    const gridRows = 2;
-    let gridData = Array.from({ length: 10 }, () => ({
+    const gridRows = 4;
+    let gridData = Array.from({ length: gridCols * gridRows }, () => ({
         currentStroke: 0,
         pointsReached: 0,
         complete: false,
         strokes: null 
     }));
 
-    // 글자 데이터 (あ 기준)
+    // 글자 데이터 (あ 기준 - 이미지의 폰트 중심에 맞춰 좌표 정교화)
     const charLibrary = {
         'A': {
             strokes: [
-                { points: [{x:0.25, y:0.4}, {x:0.75, y:0.4}] }, 
-                { points: [{x:0.5, y:0.2}, {x:0.5, y:0.8}] },
-                { points: [{x:0.7, y:0.3}, {x:0.3, y:0.7}, {x:0.8, y:0.6}] }
+                { points: [{x:0.25, y:0.35}, {x:0.5, y:0.35}, {x:0.75, y:0.35}] }, // 1획: 가로
+                { points: [{x:0.5, y:0.15}, {x:0.5, y:0.5}, {x:0.5, y:0.85}] }, // 2획: 세로
+                { points: [{x:0.65, y:0.25}, {x:0.35, y:0.55}, {x:0.5, y:0.8}, {x:0.8, y:0.6}, {x:0.6, y:0.45}] } // 3획: 곡선
             ]
         }
     };
@@ -116,7 +113,6 @@
     function resize() {
         canvas.width = canvas.offsetWidth;
         canvas.height = canvas.offsetHeight;
-        // 리사이즈 후 초기화가 필요하면 여기서 호출
     }
     window.addEventListener('resize', resize);
     resize();
@@ -124,8 +120,8 @@
 
     function getPos(e) {
         const rect = canvas.getBoundingClientRect();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+        const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
         return {
             x: clientX - rect.left,
             y: clientY - rect.top
@@ -137,13 +133,19 @@
         const rowHeight = canvas.height / gridRows;
         const col = Math.floor(x / colWidth);
         const row = Math.floor(y / rowHeight);
+        
+        // 범위 밖 예외 처리
+        if (col < 0 || col >= gridCols || row < 0 || row >= gridRows) return -1;
         return row * gridCols + col;
     }
 
     function startDrawing(e) {
+        const pos = getPos(e);
+        const idx = getGridIndex(pos.x, pos.y);
+        if (idx === -1) return;
+
         isDrawing = true;
         ctx.beginPath();
-        const pos = getPos(e);
         ctx.moveTo(pos.x, pos.y);
     }
 
@@ -152,12 +154,12 @@
         const pos = getPos(e);
         const idx = getGridIndex(pos.x, pos.y);
         
-        if (idx >= 0 && idx < 10) {
+        if (idx !== -1) {
             ctx.lineTo(pos.x, pos.y);
-            ctx.lineWidth = 6; // 펜 두께를 6으로 줄임 (기존 12)
+            ctx.lineWidth = 5; // 펜 두께를 5로 더 세밀하게 조정
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
-            ctx.strokeStyle = '#222'; // 조금 더 선명한 검정 계열
+            ctx.strokeStyle = '#222';
             ctx.stroke();
             
             checkAccuracy(idx, pos.x, pos.y);
@@ -177,12 +179,13 @@
         const stroke = state.strokes[state.currentStroke];
         if (!stroke) return;
 
+        // 체크포인트 판정 (반경을 0.22로 늘려 싱크로율 보완)
         const nextPtIdx = stroke.points.findIndex(p => !p.reached);
         if (nextPtIdx !== -1) {
             const target = stroke.points[nextPtIdx];
             const dist = Math.hypot(target.x - relX, target.y - relY);
             
-            if (dist < 0.2) { // 판정 범위를 조금 더 너그럽게 조절
+            if (dist < 0.22) { 
                 target.reached = true;
                 state.pointsReached++;
                 
