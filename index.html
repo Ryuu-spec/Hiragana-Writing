@@ -2,8 +2,8 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>히라가나 20칸 연습 도구 - 최적화 버전</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>히라가나 20칸 연습 도구 - PC/모바일 최적화</title>
     <style>
         body {
             margin: 0;
@@ -12,6 +12,7 @@
             background-color: transparent; 
             font-family: 'Noto Sans KR', sans-serif;
             user-select: none;
+            -webkit-user-select: none;
         }
         .canvas-container {
             position: relative;
@@ -29,7 +30,7 @@
             justify-content: space-between;
             align-items: center;
             pointer-events: none;
-            z-index: 10;
+            z-index: 100;
         }
         .status-badge {
             background: rgba(46, 134, 222, 0.95);
@@ -40,7 +41,8 @@
             font-weight: bold;
             pointer-events: auto;
             box-shadow: 0 2px 10px rgba(0,0,0,0.15);
-            transition: all 0.2s;
+            min-width: 150px;
+            text-align: center;
         }
         .reset-btn {
             background: rgba(255, 107, 107, 0.95);
@@ -54,13 +56,13 @@
             font-size: 13px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.15);
         }
-        .reset-btn:hover { background: #ff5252; }
         canvas {
             background-color: transparent; 
-            cursor: url('https://cdn-icons-png.flaticon.com/32/595/595582.png'), crosshair;
-            touch-action: none;
+            cursor: crosshair;
+            touch-action: none; /* 브라우저 터치 제스처 방지 */
             width: 100%;
             height: 100%;
+            display: block;
         }
     </style>
 </head>
@@ -68,7 +70,7 @@
 
 <div class="canvas-container">
     <div class="ui-overlay">
-        <div class="status-badge" id="info">연습할 칸에 'あ'를 써보세요</div>
+        <div class="status-badge" id="info">연습장에 'あ'를 써보세요</div>
         <button class="reset-btn" onclick="resetAll()">전체 지우기</button>
     </div>
     <canvas id="paintCanvas"></canvas>
@@ -76,38 +78,20 @@
 
 <script>
     const canvas = document.getElementById('paintCanvas');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: true });
     const info = document.getElementById('info');
     
     let isDrawing = false;
-    let lastPos = null;
+    let lastPos = { x: 0, y: 0 };
     
-    // 5열 4행 설정 (총 20칸)
     const gridCols = 5;
     const gridRows = 4;
 
-    // 히라가나 'あ' 가이드 좌표 데이터 (촘촘하게 보강)
-    // 이미지상의 'あ' 폰트 궤적을 촘촘한 포인트로 데이터화
     const charTemplate = {
-        name: 'A',
         strokes: [
-            // 1획: 가로
-            { points: [
-                {x:0.2, y:0.35}, {x:0.3, y:0.35}, {x:0.4, y:0.35}, 
-                {x:0.5, y:0.35}, {x:0.6, y:0.35}, {x:0.7, y:0.35}, {x:0.8, y:0.35}
-            ]},
-            // 2획: 세로
-            { points: [
-                {x:0.5, y:0.15}, {x:0.5, y:0.25}, {x:0.5, y:0.35}, 
-                {x:0.5, y:0.45}, {x:0.5, y:0.55}, {x:0.5, y:0.65}, {x:0.5, y:0.75}, {x:0.5, y:0.85}
-            ]},
-            // 3획: 곡선 (이미지 폰트에 맞춰 굴곡 강화)
-            { points: [
-                {x:0.65, y:0.25}, {x:0.55, y:0.35}, {x:0.45, y:0.45}, {x:0.35, y:0.55},
-                {x:0.3, y:0.65}, {x:0.35, y:0.75}, {x:0.45, y:0.82}, {x:0.55, y:0.85},
-                {x:0.65, y:0.82}, {x:0.75, y:0.75}, {x:0.82, y:0.65}, {x:0.82, y:0.55},
-                {x:0.75, y:0.45}, {x:0.65, y:0.42}, {x:0.55, y:0.45}
-            ]}
+            { points: [{x:0.25, y:0.38}, {x:0.5, y:0.38}, {x:0.75, y:0.38}] },
+            { points: [{x:0.5, y:0.18}, {x:0.5, y:0.5}, {x:0.5, y:0.82}] },
+            { points: [{x:0.65, y:0.25}, {x:0.35, y:0.55}, {x:0.5, y:0.85}, {x:0.8, y:0.65}, {x:0.55, y:0.45}] }
         ]
     };
 
@@ -119,24 +103,36 @@
     }));
 
     function resize() {
+        // 해상도 대응 (High DPI)
         const dpr = window.devicePixelRatio || 1;
-        canvas.width = canvas.offsetWidth * dpr;
-        canvas.height = canvas.offsetHeight * dpr;
-        ctx.scale(dpr, dpr);
+        const rect = canvas.getBoundingClientRect();
         
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        
+        ctx.scale(dpr, dpr);
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.lineWidth = 6;
-        ctx.strokeStyle = '#1e1e1e';
+        ctx.lineWidth = 4; // PC에서 더 깔끔하게 보이도록 약간 가늘게 조정
+        ctx.strokeStyle = '#222';
     }
 
     window.addEventListener('resize', resize);
+    window.addEventListener('load', resize);
     resize();
 
     function getPos(e) {
         const rect = canvas.getBoundingClientRect();
-        const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
-        const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
+        let clientX, clientY;
+        
+        if (e.touches && e.touches.length > 0) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+
         return {
             x: clientX - rect.left,
             y: clientY - rect.top
@@ -148,17 +144,20 @@
         const rowHeight = canvas.offsetHeight / gridRows;
         const col = Math.floor(x / colWidth);
         const row = Math.floor(y / rowHeight);
+        
         if (col < 0 || col >= gridCols || row < 0 || row >= gridRows) return -1;
         return row * gridCols + col;
     }
 
     function startDrawing(e) {
-        const pos = getPos(e);
-        const idx = getGridIndex(pos.x, pos.y);
-        if (idx === -1) return;
+        // 마우스 오른쪽 버튼 등 무시
+        if (e.button !== undefined && e.button !== 0) return;
         
+        const pos = getPos(e);
         isDrawing = true;
         lastPos = pos;
+        
+        // 점 하나 찍기 예방: 시작할 때 아주 작은 선을 그려줌
         ctx.beginPath();
         ctx.moveTo(pos.x, pos.y);
     }
@@ -166,43 +165,43 @@
     function draw(e) {
         if (!isDrawing) return;
         
-        // 성능 최적화: 브라우저 주사율에 맞춰 그리기
-        requestAnimationFrame(() => {
-            if (!isDrawing) return;
-            const pos = getPos(e);
-            const idx = getGridIndex(pos.x, pos.y);
+        // 브라우저 기본 드래그 방지
+        if (e.cancelable) e.preventDefault();
+
+        const pos = getPos(e);
+        const idx = getGridIndex(pos.x, pos.y);
+        
+        if (idx !== -1) {
+            ctx.beginPath();
+            ctx.moveTo(lastPos.x, lastPos.y);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
             
-            if (idx !== -1) {
-                ctx.beginPath();
-                ctx.moveTo(lastPos.x, lastPos.y);
-                ctx.lineTo(pos.x, pos.y);
-                ctx.stroke();
-                
-                checkAccuracy(idx, pos.x, pos.y);
-                lastPos = pos;
-            }
-        });
+            checkAccuracy(idx, pos.x, pos.y);
+            lastPos = pos;
+        }
+    }
+
+    function stopDrawing() {
+        isDrawing = false;
     }
 
     function checkAccuracy(idx, x, y) {
         const state = gridStates[idx];
-        if (state.complete) return;
+        if (!state || state.complete) return;
 
         const colWidth = canvas.offsetWidth / gridCols;
         const rowHeight = canvas.offsetHeight / gridRows;
-        
-        // 해당 칸 내부의 상대 좌표 (0~1)
         const relX = (x % colWidth) / colWidth;
         const relY = (y % rowHeight) / rowHeight;
 
         let updated = false;
 
-        // 모든 획의 포인트를 검사 (획순 무관하게 근처에 오면 인식하도록 개선하여 싱크로율 UP)
         charTemplate.strokes.forEach((stroke, sIdx) => {
             stroke.points.forEach((pt, pIdx) => {
                 if (!state.checkpointStatus[sIdx][pIdx]) {
                     const dist = Math.hypot(pt.x - relX, pt.y - relY);
-                    if (dist < 0.12) { // 판정 정밀도 (0.1 ~ 0.15 사이가 적당)
+                    if (dist < 0.22) { // 판정 반경 최적화
                         state.checkpointStatus[sIdx][pIdx] = true;
                         state.pointsReached++;
                         updated = true;
@@ -213,15 +212,19 @@
 
         if (updated) {
             const acc = Math.round((state.pointsReached / state.totalPoints) * 100);
-            info.style.background = `linear-gradient(90deg, #2e86de ${acc}%, rgba(46, 134, 222, 0.9) ${acc}%)`;
-            info.innerText = `${idx + 1}번 칸 정확도: ${acc}%`;
+            updateInfoUI(idx, acc);
 
-            if (acc >= 95) { // 95% 이상이면 완성으로 처리
+            if (acc >= 90) {
                 state.complete = true;
-                info.innerText = `${idx + 1}번 칸 완성! 아주 잘 썼어요! ✨`;
+                info.innerText = `${idx + 1}번 완성! ✨`;
                 info.style.background = '#27ae60';
             }
         }
+    }
+
+    function updateInfoUI(idx, acc) {
+        info.style.background = `linear-gradient(90deg, #2e86de ${acc}%, rgba(46, 134, 222, 0.9) ${acc}%)`;
+        info.innerText = `${idx + 1}번 연습 중 (${acc}%)`;
     }
 
     function resetAll() {
@@ -235,21 +238,19 @@
         info.style.background = "rgba(46, 134, 222, 0.95)";
     }
 
-    // 마우스 이벤트
+    // PC 마우스 이벤트
     canvas.addEventListener('mousedown', startDrawing);
     window.addEventListener('mousemove', draw);
-    window.addEventListener('mouseup', () => isDrawing = false);
+    window.addEventListener('mouseup', stopDrawing);
 
-    // 터치 이벤트
+    // 모바일 터치 이벤트
     canvas.addEventListener('touchstart', (e) => {
-        e.preventDefault();
         startDrawing(e);
     }, {passive: false});
     canvas.addEventListener('touchmove', (e) => {
-        e.preventDefault();
         draw(e);
     }, {passive: false});
-    canvas.addEventListener('touchend', () => isDrawing = false);
+    canvas.addEventListener('touchend', stopDrawing);
 
 </script>
 </body>
