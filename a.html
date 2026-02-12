@@ -54,6 +54,7 @@
             position: absolute;
             border: 1px dashed rgba(100, 100, 255, 0.2);
             pointer-events: none;
+            display: none;
         }
 
         .accuracy-display {
@@ -122,25 +123,34 @@
         }
 
         .control-btn {
-            background: rgba(255, 255, 255, 0.95);
-            border: 2px solid #333;
-            border-radius: 12px;
-            padding: 12px 20px;
+            background: rgba(255, 223, 223, 0.9);
+            border: none;
+            border-radius: 8px;
+            padding: 8px 14px;
             font-family: 'Klee One', cursive;
-            font-size: 14px;
+            font-size: 12px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s ease;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
         .control-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            background: rgba(255, 200, 200, 0.95);
         }
 
         .control-btn:active {
             transform: translateY(0);
+        }
+
+        .control-btn:nth-child(2) {
+            background: rgba(223, 237, 255, 0.9);
+        }
+
+        .control-btn:nth-child(2):hover {
+            background: rgba(200, 225, 255, 0.95);
         }
 
         .stroke-indicator {
@@ -207,7 +217,6 @@
     <div class="controls">
         <button class="control-btn" onclick="clearCanvas()">전체 지우기</button>
         <button class="control-btn" onclick="clearCurrentCell()">현재 칸 지우기</button>
-        <button class="control-btn" onclick="toggleGrid()">격자 ON/OFF</button>
     </div>
 
     <div class="stroke-indicator" id="stroke-indicator">
@@ -234,9 +243,11 @@
         let currentPath = [];
         
         // Grid configuration (5 columns x 4 rows = 20 cells)
+        // Grid starts after the left panel (approximately 52% from left)
         const COLS = 5;
         const ROWS = 4;
         const TOTAL_CELLS = COLS * ROWS;
+        const LEFT_PANEL_WIDTH_RATIO = 0.52; // Left panel takes ~52% of width
         
         // Cell tracking
         let cells = [];
@@ -330,22 +341,23 @@
             gridOverlay.innerHTML = '';
             cells = [];
             
-            const cellWidth = window.innerWidth / COLS;
-            const cellHeight = window.innerHeight / ROWS;
+            // Calculate grid area (right side only, excluding left panel)
+            const gridStartX = window.innerWidth * LEFT_PANEL_WIDTH_RATIO;
+            const gridWidth = window.innerWidth - gridStartX;
+            const gridHeight = window.innerHeight;
             
-            // Skip the first 5 cells (top row with あいうえお examples)
+            const cellWidth = gridWidth / COLS;
+            const cellHeight = gridHeight / ROWS;
+            
             for (let row = 0; row < ROWS; row++) {
                 for (let col = 0; col < COLS; col++) {
                     const index = row * COLS + col;
-                    
-                    // Skip first row (display examples only)
-                    if (row === 0) continue;
                     
                     const cell = {
                         index: index,
                         row: row,
                         col: col,
-                        x: col * cellWidth,
+                        x: gridStartX + (col * cellWidth),
                         y: row * cellHeight,
                         width: cellWidth,
                         height: cellHeight,
