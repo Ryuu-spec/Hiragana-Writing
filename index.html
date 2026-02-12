@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>히라가나 20칸 연습 도구 - 좌표 보정 완료</title>
+    <title>히라가나 20칸 연습 도구 - 로직 수정 완료</title>
     <style>
         body {
             margin: 0;
@@ -24,8 +24,8 @@
         }
         .ui-overlay {
             position: absolute;
-            top: 8px;
-            width: 92%;
+            top: 10px;
+            width: 90%;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -35,25 +35,25 @@
         .status-badge {
             background: rgba(46, 134, 222, 0.95);
             color: white;
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 13px;
+            padding: 8px 18px;
+            border-radius: 25px;
+            font-size: 14px;
             font-weight: bold;
             pointer-events: auto;
             box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            min-width: 160px;
+            min-width: 180px;
             text-align: center;
         }
         .reset-btn {
             background: rgba(255, 107, 107, 0.95);
             color: white;
             border: none;
-            padding: 6px 16px;
-            border-radius: 8px;
+            padding: 8px 18px;
+            border-radius: 10px;
             cursor: pointer;
             pointer-events: auto;
             font-weight: bold;
-            font-size: 13px;
+            font-size: 14px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         }
         canvas {
@@ -87,19 +87,27 @@
     const gridCols = 5;
     const gridRows = 4;
 
-    // 히라가나 'あ' 가이드 좌표 (이미지 폰트 궤적에 최적화)
+    // 히라가나 'あ' 가이드 좌표 (판정 지점을 획순별로 분리하여 정확도 계산 방식 개선)
     const charTemplate = {
         strokes: [
-            { points: [{x:0.25, y:0.38}, {x:0.5, y:0.38}, {x:0.75, y:0.38}] },
-            { points: [{x:0.5, y:0.18}, {x:0.5, y:0.5}, {x:0.5, y:0.82}] },
-            { points: [{x:0.65, y:0.25}, {x:0.35, y:0.55}, {x:0.5, y:0.85}, {x:0.8, y:0.65}, {x:0.55, y:0.45}] }
+            // 1획 (가로) - 5개 포인트
+            { id: 0, points: [{x:0.25, y:0.38}, {x:0.37, y:0.38}, {x:0.5, y:0.38}, {x:0.62, y:0.38}, {x:0.75, y:0.38}] },
+            // 2획 (세로) - 6개 포인트
+            { id: 1, points: [{x:0.5, y:0.18}, {x:0.5, y:0.3}, {x:0.5, y:0.45}, {x:0.5, y:0.6}, {x:0.5, y:0.75}, {x:0.5, y:0.85}] },
+            // 3획 (곡선) - 10개 포인트
+            { id: 2, points: [
+                {x:0.65, y:0.25}, {x:0.55, y:0.35}, {x:0.45, y:0.45}, {x:0.35, y:0.55}, 
+                {x:0.32, y:0.7}, {x:0.45, y:0.85}, {x:0.65, y:0.85}, {x:0.8, y:0.7}, 
+                {x:0.78, y:0.5}, {x:0.6, y:0.45}
+            ]}
         ]
     };
 
+    const totalPointsCount = charTemplate.strokes.reduce((acc, s) => acc + s.points.length, 0);
+
     let gridStates = Array.from({ length: 20 }, () => ({
-        pointsReached: 0,
-        totalPoints: charTemplate.strokes.reduce((acc, s) => acc + s.points.length, 0),
         checkpointStatus: charTemplate.strokes.map(s => s.points.map(() => false)),
+        pointsReached: 0,
         complete: false
     }));
 
@@ -112,7 +120,7 @@
         
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.lineWidth = 4;
+        ctx.lineWidth = 5;
         ctx.strokeStyle = '#1e1e1e';
     }
 
@@ -123,7 +131,6 @@
     function getPos(e) {
         const rect = canvas.getBoundingClientRect();
         let clientX, clientY;
-        
         if (e.touches && e.touches.length > 0) {
             clientX = e.touches[0].clientX;
             clientY = e.touches[0].clientY;
@@ -131,39 +138,29 @@
             clientX = e.clientX;
             clientY = e.clientY;
         }
-
-        return {
-            x: clientX - rect.left,
-            y: clientY - rect.top
-        };
+        return { x: clientX - rect.left, y: clientY - rect.top };
     }
 
-    /**
-     * 칸 번호 인식 오류 해결을 위한 핵심 함수
-     * 캔버스 내부의 여백(Padding)을 고려하여 인덱스를 계산합니다.
-     */
     function getGridIndex(x, y) {
         const w = canvas.offsetWidth;
         const h = canvas.offsetHeight;
         
-        // 이미지 상단 UI와 하단 여백이 있을 경우를 대비해 범위를 보정
-        const colWidth = w / gridCols;
-        const rowHeight = h / gridRows;
+        // 정밀한 칸 인덱스 계산을 위해 부동 소수점 오차 방지
+        const col = Math.floor(x / (w / gridCols));
+        const row = Math.floor(y / (h / gridRows));
         
-        // 0.5픽셀 정도의 오차를 방지하기 위해 클램핑(Clamping) 처리
-        const col = Math.max(0, Math.min(gridCols - 1, Math.floor(x / colWidth)));
-        const row = Math.max(0, Math.min(gridRows - 1, Math.floor(y / rowHeight)));
-        
+        if (col < 0 || col >= gridCols || row < 0 || row >= gridRows) return -1;
         return row * gridCols + col;
     }
 
     function startDrawing(e) {
         if (e.button !== undefined && e.button !== 0) return;
         const pos = getPos(e);
+        const idx = getGridIndex(pos.x, pos.y);
+        if (idx === -1) return;
+
         isDrawing = true;
         lastPos = pos;
-        
-        // 드로잉 시작 지점 표시 (점 방지)
         ctx.beginPath();
         ctx.moveTo(pos.x, pos.y);
     }
@@ -178,7 +175,6 @@
         if (idx !== -1) {
             ctx.lineTo(pos.x, pos.y);
             ctx.stroke();
-            
             checkAccuracy(idx, pos.x, pos.y);
             lastPos = pos;
         }
@@ -198,28 +194,28 @@
         const colWidth = canvas.offsetWidth / gridCols;
         const rowHeight = canvas.offsetHeight / gridRows;
         
-        // 각 칸의 중심을 기준으로 상대 좌표 재계산
         const relX = (x % colWidth) / colWidth;
         const relY = (y % rowHeight) / rowHeight;
 
-        let updated = false;
+        let pointsJustAdded = 0;
 
         charTemplate.strokes.forEach((stroke, sIdx) => {
             stroke.points.forEach((pt, pIdx) => {
                 if (!state.checkpointStatus[sIdx][pIdx]) {
                     const dist = Math.hypot(pt.x - relX, pt.y - relY);
-                    // 판정 범위를 0.3으로 더 넓혀서 싱크로율 문제 해결
-                    if (dist < 0.3) { 
+                    // 판정 반경 0.18로 최적화 (너무 넓으면 획 하나에 점수가 다 참)
+                    if (dist < 0.18) { 
                         state.checkpointStatus[sIdx][pIdx] = true;
                         state.pointsReached++;
-                        updated = true;
+                        pointsJustAdded++;
                     }
                 }
             });
         });
 
-        if (updated) {
-            const acc = Math.round((state.pointsReached / state.totalPoints) * 100);
+        if (pointsJustAdded > 0) {
+            // 정확도 계산: 전체 포인트 중 획득한 포인트 비율
+            const acc = Math.round((state.pointsReached / totalPointsCount) * 100);
             updateInfoUI(idx, acc);
 
             if (acc >= 90) {
@@ -231,7 +227,6 @@
     }
 
     function updateInfoUI(idx, acc) {
-        // 현재 위치한 칸의 번호를 실시간으로 반영
         info.style.background = `linear-gradient(90deg, #2e86de ${acc}%, rgba(46, 134, 222, 0.9) ${acc}%)`;
         info.innerText = `${idx + 1}번 칸 연습 중 (${acc}%)`;
     }
