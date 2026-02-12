@@ -20,100 +20,92 @@
             flex-direction: column;
             align-items: center;
         }
-        canvas {
-            background-color: transparent; 
-            cursor: crosshair;
-            touch-action: none;
-            width: 100%;
-            height: 85%;
-        }
+        /* UI 레이아웃을 상단으로 이동 */
         .ui-overlay {
             position: absolute;
-            bottom: 15px;
+            top: 10px; /* 위로 올림 */
             width: 90%;
             display: flex;
             justify-content: space-between;
             align-items: center;
             pointer-events: none;
+            z-index: 10;
         }
         .status-badge {
             background: rgba(46, 134, 222, 0.9);
             color: white;
-            padding: 6px 18px;
-            border-radius: 20px;
-            font-size: 14px;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 13px;
             font-weight: bold;
             pointer-events: auto;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
         .reset-btn {
             background: rgba(255, 107, 107, 0.9);
             color: white;
             border: none;
-            padding: 6px 18px;
+            padding: 4px 12px;
             border-radius: 8px;
             cursor: pointer;
             pointer-events: auto;
             font-weight: bold;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            font-size: 13px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
-        .reset-btn:active {
-            transform: scale(0.95);
+        canvas {
+            background-color: transparent; 
+            cursor: crosshair;
+            touch-action: none;
+            width: 100%;
+            height: 100%; /* 전체 영역 사용 */
         }
     </style>
 </head>
 <body>
 
 <div class="canvas-container">
-    <canvas id="paintCanvas"></canvas>
-    
+    <!-- UI가 위로 올라왔습니다 -->
     <div class="ui-overlay">
-        <div class="status-badge" id="info">연습할 칸에 글자를 써보세요</div>
+        <div class="status-badge" id="info">연습장에 써보세요</div>
         <button class="reset-btn" onclick="resetAll()">전체 지우기</button>
     </div>
+    
+    <canvas id="paintCanvas"></canvas>
 </div>
 
 <script>
-    /**
-     * GitHub 사용자를 위한 팁:
-     * 이 파일명을 'index.html'로 해서 저장하고 깃허브 레포지토리에 올린 뒤,
-     * GitHub Pages 설정을 켜면 웹 주소(URL)가 생성됩니다.
-     */
-
     const canvas = document.getElementById('paintCanvas');
     const ctx = canvas.getContext('2d');
     const info = document.getElementById('info');
     
     let isDrawing = false;
     
-    // 10개 칸의 상태 관리 (5열 2행 기준)
+    // 5열 2행 격자 설정
     const gridCols = 5;
     const gridRows = 2;
     let gridData = Array.from({ length: 10 }, () => ({
         currentStroke: 0,
         pointsReached: 0,
         complete: false,
-        // 각 칸별로 체크포인트 상태를 복사해서 가짐
         strokes: null 
     }));
 
-    // 글자 데이터 라이브러리 (필요한 글자를 여기에 추가하세요)
+    // 글자 데이터 (あ 기준)
     const charLibrary = {
         'A': {
             strokes: [
-                { points: [{x:0.25, y:0.4}, {x:0.75, y:0.4}], reachedCount: 0 }, 
-                { points: [{x:0.5, y:0.2}, {x:0.5, y:0.8}], reachedCount: 0 },
-                { points: [{x:0.7, y:0.3}, {x:0.3, y:0.7}, {x:0.8, y:0.6}], reachedCount: 0 }
+                { points: [{x:0.25, y:0.4}, {x:0.75, y:0.4}] }, 
+                { points: [{x:0.5, y:0.2}, {x:0.5, y:0.8}] },
+                { points: [{x:0.7, y:0.3}, {x:0.3, y:0.7}, {x:0.8, y:0.6}] }
             ]
         }
     };
 
-    // 현재 페이지의 목표 글자 설정
     const currentChar = 'A'; 
 
     function initGrid() {
         gridData.forEach(data => {
-            // 깊은 복사를 통해 각 칸마다 독립적인 체크포인트 상태 부여
             data.strokes = JSON.parse(JSON.stringify(charLibrary[currentChar].strokes));
             data.currentStroke = 0;
             data.pointsReached = 0;
@@ -124,6 +116,7 @@
     function resize() {
         canvas.width = canvas.offsetWidth;
         canvas.height = canvas.offsetHeight;
+        // 리사이즈 후 초기화가 필요하면 여기서 호출
     }
     window.addEventListener('resize', resize);
     resize();
@@ -161,10 +154,10 @@
         
         if (idx >= 0 && idx < 10) {
             ctx.lineTo(pos.x, pos.y);
-            ctx.lineWidth = 12;
+            ctx.lineWidth = 6; // 펜 두께를 6으로 줄임 (기존 12)
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
-            ctx.strokeStyle = '#333';
+            ctx.strokeStyle = '#222'; // 조금 더 선명한 검정 계열
             ctx.stroke();
             
             checkAccuracy(idx, pos.x, pos.y);
@@ -189,7 +182,7 @@
             const target = stroke.points[nextPtIdx];
             const dist = Math.hypot(target.x - relX, target.y - relY);
             
-            if (dist < 0.18) { // 인식 감도 조절 (0.15~0.2 권장)
+            if (dist < 0.2) { // 판정 범위를 조금 더 너그럽게 조절
                 target.reached = true;
                 state.pointsReached++;
                 
@@ -205,7 +198,7 @@
 
                 if (acc >= 100) {
                     state.complete = true;
-                    info.innerText = `${idx + 1}번 칸 완성! 아주 잘했어요 ✨`;
+                    info.innerText = `${idx + 1}번 완성! ✨`;
                 }
             }
         }
@@ -214,7 +207,7 @@
     function resetAll() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         initGrid();
-        info.innerText = "전체 지워짐. 다시 시작!";
+        info.innerText = "전체 지움. 다시 시작!";
     }
 
     canvas.addEventListener('mousedown', startDrawing);
