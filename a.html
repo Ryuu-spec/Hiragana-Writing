@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hiragana Writing Overlay</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700;900&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ─────────────────────────────────────────────
+   전체 페이지 = 투명, Genially 슬라이드 위에 씌움
+   슬라이드 비율: 16:9 (1600 x 900 기준)
+───────────────────────────────────────────── */
+html, body {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+
+/*
+  16:9 비율 유지 컨테이너
+  - 화면 크기에 맞춰 자동 스케일
+  - position:absolute로 정확한 % 포지셔닝
+*/
+.slide {
+  position: absolute;
+  /* 화면 크기에 맞춰 16:9 비율로 채우기 */
+  width: 100vw;
+  height: 56.25vw; /* 9/16 */
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: transparent;
+}
+
+/* 화면이 세로로 더 좁을 때 */
+@media (max-aspect-ratio: 16/9) {
+  .slide {
+    height: 100vh;
+    width: 177.78vh; /* 16/9 */
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+}
+
+/*
+  ─── 20칸 그리드 오버레이 ───
+  Genially 1600x900 기준 측정값:
+    grid x1=830  → left  = 830/1600 = 51.875%
+    grid y1=228  → top   = 228/900  = 25.333%
+    grid w=735   → width = 735/1600 = 45.938%
+    grid h=557   → height= 557/900  = 61.889%
+*/
+.grid-overlay {
+  position: absolute;
+  left:   51.875%;
+  top:    25.333%;
+  width:  45.938%;
+  height: 61.889%;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  /* 셀 간격: PDF에서 약 6px / 1600px = 0.375% */
+  gap: 0.45%;
+  background: transparent;
+}
+
+/* ─── 개별 셀 ─── */
+.w-cell {
+  position: relative;
+  background: transparent;
+  border: none;
+  overflow: hidden;
+  cursor: crosshair;
+}
+
+/* 완성 시 연초록 틴트 */
+.w-cell.complete {
+  background: rgba(39, 174, 96, 0.06);
+  border-radius: 2px;
+}
+
+/* 캔버스 */
+.w-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  touch-action: none;
+}
+
+/* ── 피드백 바 (셀 상단) ── */
+.cell-fb {
+  position: absolute;
+  top: 2px; left: 2px; right: 2px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  pointer-events: none;
+}
+
+/* 획순 pip 점 */
+.pips { display: flex; gap: 2px; align-items: center; }
+
+.pip {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: rgba(180,180,200,0.5);
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.pip.done    { background: #27ae60; }
+.pip.current { background: #f39c12; animation: blink 0.8s infinite; }
+
+@keyframes blink {
+  0%,100% { opacity:1; }
+  50%     { opacity:0.4; }
+}
+
+/* 정확도 배지 */
+.acc {
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: clamp(7px, 0.7vw, 11px);
+  font-weight: 900;
+  border-radius: 8px;
+  padding: 1px 4px;
+  color: white;
+  background: rgba(150,150,170,0.7);
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.acc.great { background: rgba(39,174,96,0.85); }
+.acc.good  { background: rgba(59,130,246,0.85); }
+.acc.ok    { background: rgba(243,156,18,0.85); }
+.acc.poor  { background: rgba(230,57,70,0.85); }
+
+/* 현재 획 힌트 (셀 우하단) */
+.stroke-hint {
+  position: absolute;
+  bottom: 2px; right: 3px;
+  z-index: 5;
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: clamp(6px, 0.6vw, 10px);
+  font-weight: 900;
+  pointer-events: none;
+  line-height: 1;
+  text-shadow: 0 0 3px white, 0 0 6px white;
+}
+
+/* 완성 체크마크 */
+.w-done {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: clamp(14px, 2vw, 28px);
+  color: #27ae60;
+  z-index: 6;
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(0.4);
+  transition: opacity 0.3s, transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  text-shadow: 0 0 6px white;
+}
+.w-cell.complete .w-done { opacity: 1; transform: scale(1); }
+
+/* 획 완성 플래시 */
+@keyframes flash-s {
+  0%   { box-shadow: inset 0 0 0 2px rgba(59,130,246,0.5); }
+  100% { box-shadow: none; }
+}
+.w-cell.flash-s { animation: flash-s 0.3s ease-out; border-radius: 3px; }
+
+/* ── 우상단 컨트롤 패널 ── */
+.controls {
+  position: absolute;
+  top: 1%;
+  right: 0.5%;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn {
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: clamp(9px, 0.8vw, 12px);
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  backdrop-filter: blur(4px);
+}
+
+.btn-reset {
+  background: rgba(230,57,70,0.85);
+  color: white;
+}
+.btn-reset:hover { background: rgba(192,57,43,0.95); }
+
+.progress-pill {
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(4px);
+  border-radius: 12px;
+  padding: 3px 10px;
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: clamp(9px, 0.8vw, 12px);
+  font-weight: 700;
+  color: #1a1a2e;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.prog-bar {
+  width: 60px; height: 4px;
+  background: rgba(200,200,220,0.6);
+  border-radius: 2px; overflow: hidden;
+}
+.prog-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #27ae60);
+  border-radius: 2px;
+  transition: width 0.4s;
+  width: 0%;
+}
+</style>
+</head>
+<body>
+
+<div class="slide" id="slide">
+
+  <!-- 우상단 컨트롤 -->
+  <div class="controls">
+    <div class="progress-pill">
+      <span id="progText">0/20</span>
+      <div class="prog-bar"><div class="prog-fill" id="progFill"></div></div>
+    </div>
+    <button class="btn btn-reset" onclick="resetAll()">지우기</button>
+  </div>
+
+  <!-- 20칸 그리드 오버레이 -->
+  <div class="grid-overlay" id="grid"></div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+// STROKE DATA  (relative 0–1 within each cell)
+// ══════════════════════════════════════════════════
+const CHAR_DATA = {
+  'あ': {
+    strokes: [
+      { pts:[[0.26,0.33],[0.50,0.32],[0.74,0.33]], color:'#e63946', label:'①가로' },
+      { pts:[[0.50,0.33],[0.38,0.46],[0.29,0.60],[0.30,0.72],[0.40,0.81],[0.54,0.83],[0.65,0.75],[0.65,0.61],[0.53,0.52],[0.38,0.57],[0.30,0.67]], color:'#3b82f6', label:'②몸통' },
+      { pts:[[0.64,0.40],[0.72,0.55],[0.70,0.70],[0.60,0.82],[0.52,0.86]], color:'#27ae60', label:'③꼬리' }
+    ]
+  },
+  'い': {
+    strokes: [
+      { pts:[[0.32,0.26],[0.30,0.50],[0.32,0.73],[0.34,0.83]], color:'#e63946', label:'①왼쪽' },
+      { pts:[[0.64,0.24],[0.66,0.48],[0.62,0.70],[0.55,0.83],[0.46,0.88]], color:'#3b82f6', label:'②오른쪽' }
+    ]
+  },
+  'う': {
+    strokes: [
+      { pts:[[0.50,0.18],[0.50,0.26]], color:'#e63946', label:'①점' },
+      { pts:[[0.34,0.33],[0.50,0.30],[0.66,0.33]], color:'#3b82f6', label:'②가로' },
+      { pts:[[0.50,0.33],[0.40,0.50],[0.36,0.66],[0.42,0.80],[0.55,0.87],[0.68,0.82],[0.74,0.68]], color:'#27ae60', label:'③곡선' }
+    ]
+  },
+  'え': {
+    strokes: [
+      { pts:[[0.50,0.20],[0.50,0.42]], color:'#e63946', label:'①세로' },
+      { pts:[[0.22,0.40],[0.50,0.40],[0.78,0.40]], color:'#3b82f6', label:'②가로' },
+      { pts:[[0.36,0.48],[0.28,0.64],[0.34,0.80],[0.52,0.88],[0.68,0.82],[0.74,0.64]], color:'#27ae60', label:'③아래왼' },
+      { pts:[[0.66,0.50],[0.74,0.68],[0.70,0.82]], color:'#f39c12', label:'④아래오' }
+    ]
+  },
+  'お': {
+    strokes: [
+      { pts:[[0.28,0.24],[0.72,0.24]], color:'#e63946', label:'①가로' },
+      { pts:[[0.50,0.24],[0.50,0.88]], color:'#3b82f6', label:'②세로' },
+      { pts:[[0.24,0.50],[0.50,0.44],[0.76,0.54],[0.72,0.74],[0.52,0.84],[0.30,0.78],[0.24,0.62]], color:'#27ae60', label:'③둥근획' }
+    ]
+  },
+};
+
+// ══════════════════════════════════════════════════
+// CONFIG — Genially 슬라이드 기준 글자 매핑
+// 페이지 1=あ, 2=い, 3=う, 4=え, 5=お
+// URL 파라미터로 지정: ?char=い
+// ══════════════════════════════════════════════════
+function getChar() {
+  const p = new URLSearchParams(window.location.search);
+  const c = p.get('char');
+  return (c && CHAR_DATA[c]) ? c : 'あ';
+}
+
+const CURRENT_CHAR = getChar();
+const TOTAL = 20;
+const TOLERANCE = 0.17;
+const STROKE_W   = 0.055;
+
+let cells=[], canvases=[], ctxs=[], states=[];
+let drawing=false, activeIdx=-1, doneCount=0;
+
+function freshState() {
+  const d = CHAR_DATA[CURRENT_CHAR];
+  return {
+    si: 0, done: 0, complete: false,
+    cps: d.strokes.map(s=>s.pts.map(()=>false)),
+    hits: d.strokes.map(()=>0)
+  };
+}
+
+// ══════════════════════════════════════════════════
+// BUILD
+// ══════════════════════════════════════════════════
+function build() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  cells=[]; canvases=[]; ctxs=[]; states=[];
+  doneCount=0; updateProg();
+
+  const d = CHAR_DATA[CURRENT_CHAR];
+
+  for (let i=0; i<TOTAL; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'w-cell';
+
+    const cvs = document.createElement('canvas');
+    cvs.className = 'w-canvas';
+    cell.appendChild(cvs);
+
+    // 피드백 바
+    const fb = document.createElement('div');
+    fb.className = 'cell-fb';
+    const pips = document.createElement('div');
+    pips.className = 'pips';
+    d.strokes.forEach((_,si)=>{
+      const p = document.createElement('div');
+      p.className = 'pip'+(si===0?' current':'');
+      pips.appendChild(p);
+    });
+    fb.appendChild(pips);
+    const acc = document.createElement('div');
+    acc.className = 'acc';
+    acc.textContent = '-';
+    fb.appendChild(acc);
+    cell.appendChild(fb);
+
+    // 획 힌트
+    const hint = document.createElement('div');
+    hint.className = 'stroke-hint';
+    hint.textContent = d.strokes[0]?.label||'';
+    hint.style.color = d.strokes[0]?.color||'#f39c12';
+    cell.appendChild(hint);
+
+    // 완성 체크
+    const done = document.createElement('div');
+    done.className = 'w-done';
+    done.textContent = '✓';
+    cell.appendChild(done);
+
+    grid.appendChild(cell);
+    cells.push(cell);
+    canvases.push(cvs);
+    states.push(freshState());
+
+    const idx=i;
+    cvs.addEventListener('pointerdown',  e=>{e.preventDefault();startDraw(e,idx);},{passive:false});
+    cvs.addEventListener('pointermove',  e=>{e.preventDefault();moveDraw(e,idx); },{passive:false});
+    cvs.addEventListener('pointerup',    ()=>stopDraw(idx));
+    cvs.addEventListener('pointercancel',()=>stopDraw(idx));
+  }
+  requestAnimationFrame(sizeAll);
+}
+
+function sizeAll() {
+  cells.forEach((cell,i)=>{
+    const cvs=canvases[i];
+    cvs.width=cell.offsetWidth;
+    cvs.height=cell.offsetHeight;
+    ctxs[i]=cvs.getContext('2d');
+  });
+}
+window.addEventListener('resize', sizeAll);
+
+// ══════════════════════════════════════════════════
+// DRAW
+// ══════════════════════════════════════════════════
+function rel(e,cvs) {
+  const r=cvs.getBoundingClientRect();
+  return {x:(e.clientX-r.left)/r.width, y:(e.clientY-r.top)/r.height};
+}
+
+function startDraw(e,idx) {
+  drawing=true; activeIdx=idx;
+  const cvs=canvases[idx], cx=ctxs[idx], p=rel(e,cvs);
+  cx.beginPath(); cx.moveTo(p.x*cvs.width, p.y*cvs.height);
+}
+
+function moveDraw(e,idx) {
+  if (!drawing||activeIdx!==idx) return;
+  const st=states[idx]; if(st.complete) return;
+  const cvs=canvases[idx], cx=ctxs[idx], p=rel(e,cvs);
+  const px=p.x*cvs.width, py=p.y*cvs.height;
+  const d=CHAR_DATA[CURRENT_CHAR];
+  cx.lineTo(px,py);
+  cx.lineWidth=Math.min(cvs.width,cvs.height)*STROKE_W;
+  cx.lineCap='round'; cx.lineJoin='round';
+  cx.strokeStyle=d.strokes[st.si]?.color||'#1a1a2e';
+  cx.stroke(); cx.beginPath(); cx.moveTo(px,py);
+  checkHit(idx,p.x,p.y);
+}
+
+function stopDraw(idx) {
+  drawing=false; activeIdx=-1;
+}
+
+// ══════════════════════════════════════════════════
+// HIT CHECK
+// ══════════════════════════════════════════════════
+function checkHit(idx,rx,ry) {
+  const st=states[idx], d=CHAR_DATA[CURRENT_CHAR];
+  if(st.si>=d.strokes.length) return;
+  const cps=st.cps[st.si];
+  const next=cps.findIndex(v=>!v);
+  if(next===-1){advStroke(idx);return;}
+  const [tx,ty]=d.strokes[st.si].pts[next];
+  if(Math.hypot(tx-rx,ty-ry)<TOLERANCE){
+    cps[next]=true; st.hits[st.si]++;
+    updateFB(idx);
+    if(cps.every(v=>v)) advStroke(idx);
+  }
+}
+
+function advStroke(idx) {
+  const st=states[idx], d=CHAR_DATA[CURRENT_CHAR];
+  st.done++; st.si++;
+  cells[idx].classList.remove('flash-s');
+  void cells[idx].offsetWidth;
+  cells[idx].classList.add('flash-s');
+  setTimeout(()=>cells[idx].classList.remove('flash-s'),300);
+  updateFB(idx);
+  if(st.si>=d.strokes.length) completeCell(idx);
+}
+
+function updateFB(idx) {
+  const st=states[idx], d=CHAR_DATA[CURRENT_CHAR], cell=cells[idx];
+  // pips
+  cell.querySelectorAll('.pip').forEach((p,si)=>{
+    p.classList.remove('done','current');
+    if(si<st.done) p.classList.add('done');
+    else if(si===st.si&&!st.complete) p.classList.add('current');
+  });
+  // accuracy
+  const tot=d.strokes.reduce((a,s)=>a+s.pts.length,0);
+  const hit=st.hits.reduce((a,v)=>a+v,0);
+  const pct=tot>0?Math.round(hit/tot*100):0;
+  const badge=cell.querySelector('.acc');
+  badge.textContent=hit>0?pct+'%':'-';
+  badge.className='acc';
+  if(pct>=90)badge.classList.add('great');
+  else if(pct>=70)badge.classList.add('good');
+  else if(pct>=50)badge.classList.add('ok');
+  else if(pct>0) badge.classList.add('poor');
+  // hint
+  const hint=cell.querySelector('.stroke-hint');
+  if(st.complete){hint.textContent='';}
+  else{hint.textContent=d.strokes[st.si]?.label||'';hint.style.color=d.strokes[st.si]?.color||'#f39c12';}
+}
+
+function completeCell(idx) {
+  states[idx].complete=true;
+  cells[idx].classList.add('complete');
+  updateFB(idx);
+  doneCount++; updateProg();
+}
+
+function updateProg() {
+  document.getElementById('progText').textContent=`${doneCount}/20`;
+  document.getElementById('progFill').style.width=`${doneCount/20*100}%`;
+}
+
+function resetAll() {
+  cells.forEach((cell,i)=>{
+    ctxs[i]?.clearRect(0,0,canvases[i].width,canvases[i].height);
+    states[i]=freshState();
+    cell.classList.remove('complete','flash-s');
+    updateFB(i);
+  });
+  doneCount=0; updateProg();
+}
+
+build();
+</script>
+</body>
+</html>
