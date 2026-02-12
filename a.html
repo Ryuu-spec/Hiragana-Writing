@@ -18,6 +18,8 @@ html, body {
   height: 100%;
   background: transparent;
   overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /*
@@ -89,6 +91,7 @@ html, body {
   inset: 0;
   z-index: 3;
   touch-action: none;
+  cursor: inherit;
 }
 
 /* ── 피드백 바 (셀 상단) ── */
@@ -308,7 +311,10 @@ const TOLERANCE = 0.17;
 const STROKE_W   = 0.035;  // 얇게
 
 let cells=[], canvases=[], ctxs=[], states=[];
-let drawing=false, activeIdx=-1, doneCount=0;
+let doneCount=0;
+
+// 각 캔버스별 그리기 상태 추적
+let drawingStates = [];
 
 function freshState() {
   const d = CHAR_DATA[CURRENT_CHAR];
@@ -325,7 +331,7 @@ function freshState() {
 function build() {
   const grid = document.getElementById('grid');
   grid.innerHTML = '';
-  cells=[]; canvases=[]; ctxs=[]; states=[];
+  cells=[]; canvases=[]; ctxs=[]; states=[]; drawingStates=[];
   doneCount=0; updateProg();
 
   const d = CHAR_DATA[CURRENT_CHAR];
@@ -372,12 +378,37 @@ function build() {
     cells.push(cell);
     canvases.push(cvs);
     states.push(freshState());
+    drawingStates.push({ isDrawing: false, pointerId: null });
 
     const idx=i;
-    cvs.addEventListener('pointerdown',  e=>{e.preventDefault();startDraw(e,idx);},{passive:false});
-    cvs.addEventListener('pointermove',  e=>{e.preventDefault();moveDraw(e,idx); },{passive:false});
-    cvs.addEventListener('pointerup',    ()=>stopDraw(idx));
-    cvs.addEventListener('pointercancel',()=>stopDraw(idx));
+    
+    // 개선된 이벤트 핸들러
+    cvs.addEventListener('pointerdown', function(e) {
+      e.preventDefault();
+      startDraw(e, idx);
+    }, {passive:false});
+    
+    cvs.addEventListener('pointermove', function(e) {
+      e.preventDefault();
+      moveDraw(e, idx);
+    }, {passive:false});
+    
+    cvs.addEventListener('pointerup', function(e) {
+      e.preventDefault();
+      stopDraw(e, idx);
+    }, {passive:false});
+    
+    cvs.addEventListener('pointercancel', function(e) {
+      e.preventDefault();
+      stopDraw(e, idx);
+    }, {passive:false});
+    
+    // 포인터가 캔버스를 떠날 때도 처리
+    cvs.addEventListener('pointerleave', function(e) {
+      if (drawingStates[idx].isDrawing && drawingStates[idx].pointerId === e.pointerId) {
+        // 포인터가 캔버스를 떠나도 계속 추적
+      }
+    });
   }
   requestAnimationFrame(sizeAll);
 }
@@ -385,12 +416,29 @@ function build() {
 function sizeAll() {
   cells.forEach((cell,i)=>{
     const cvs=canvases[i];
-    cvs.width=cell.offsetWidth;
-    cvs.height=cell.offsetHeight;
-    ctxs[i]=cvs.getContext('2d');
+    const w = cell.offsetWidth;
+    const h = cell.offsetHeight;
+    
+    // 캔버스 크기가 실제로 변경되었을 때만 리사이즈
+    if (cvs.width !== w || cvs.height !== h) {
+      cvs.width = w;
+      cvs.height = h;
+      ctxs[i] = cvs.getContext('2d');
+    }
   });
 }
-window.addEventListener('resize', sizeAll);
+
+// 리사이즈 디바운스
+let resizeTimeout;
+window.addEventListener('resize', function() {
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(sizeAll, 100);
+});
+
+// 오리엔테이션 변경 감지
+window.addEventListener('orientationchange', function() {
+  setTimeout(sizeAll, 200);
+});
 
 // ══════════════════════════════════════════════════
 // DRAW
@@ -400,28 +448,73 @@ function rel(e,cvs) {
   return {x:(e.clientX-r.left)/r.width, y:(e.clientY-r.top)/r.height};
 }
 
-function startDraw(e,idx) {
-  drawing=true; activeIdx=idx;
-  const cvs=canvases[idx], cx=ctxs[idx], p=rel(e,cvs);
-  cx.beginPath(); cx.moveTo(p.x*cvs.width, p.y*cvs.height);
+function startDraw(e, idx) {
+  const drawState = drawingStates[idx];
+  const st = states[idx];
+  
+  // 이미 완성된 셀은 무시
+  if (st.complete) return;
+  
+  // 이미 다른 포인터가 그리고 있으면 무시
+  if (drawState.isDrawing) return;
+  
+  drawState.isDrawing = true;
+  drawState.pointerId = e.pointerId;
+  
+  const cvs = canvases[idx];
+  const cx = ctxs[idx];
+  const p = rel(e, cvs);
+  
+  // 포인터 캡처 - 이제 포인터가 캔버스 밖으로 나가도 이벤트를 받을 수 있음
+  cvs.setPointerCapture(e.pointerId);
+  
+  cx.beginPath();
+  cx.moveTo(p.x * cvs.width, p.y * cvs.height);
 }
 
-function moveDraw(e,idx) {
-  if (!drawing||activeIdx!==idx) return;
-  const st=states[idx]; if(st.complete) return;
-  const cvs=canvases[idx], cx=ctxs[idx], p=rel(e,cvs);
-  const px=p.x*cvs.width, py=p.y*cvs.height;
-  const d=CHAR_DATA[CURRENT_CHAR];
-  cx.lineTo(px,py);
-  cx.lineWidth=Math.min(cvs.width,cvs.height)*STROKE_W;
-  cx.lineCap='round'; cx.lineJoin='round';
-  cx.strokeStyle = 'rgba(26,26,46,0.75)';  // 반투명 먹색
-  cx.stroke(); cx.beginPath(); cx.moveTo(px,py);
-  checkHit(idx,p.x,p.y);
+function moveDraw(e, idx) {
+  const drawState = drawingStates[idx];
+  const st = states[idx];
+  
+  // 이 캔버스에서 그리고 있지 않거나, 다른 포인터면 무시
+  if (!drawState.isDrawing || drawState.pointerId !== e.pointerId) return;
+  
+  // 완성된 셀은 무시
+  if (st.complete) return;
+  
+  const cvs = canvases[idx];
+  const cx = ctxs[idx];
+  const p = rel(e, cvs);
+  const px = p.x * cvs.width;
+  const py = p.y * cvs.height;
+  
+  cx.lineTo(px, py);
+  cx.lineWidth = Math.min(cvs.width, cvs.height) * STROKE_W;
+  cx.lineCap = 'round';
+  cx.lineJoin = 'round';
+  cx.strokeStyle = 'rgba(26,26,46,0.75)';
+  cx.stroke();
+  cx.beginPath();
+  cx.moveTo(px, py);
+  
+  // 히트 체크는 상대 좌표로
+  checkHit(idx, p.x, p.y);
 }
 
-function stopDraw(idx) {
-  drawing=false; activeIdx=-1;
+function stopDraw(e, idx) {
+  const drawState = drawingStates[idx];
+  
+  // 이 포인터가 그리던 것이 아니면 무시
+  if (!drawState.isDrawing || drawState.pointerId !== e.pointerId) return;
+  
+  drawState.isDrawing = false;
+  drawState.pointerId = null;
+  
+  // 포인터 캡처 해제
+  const cvs = canvases[idx];
+  if (cvs.hasPointerCapture(e.pointerId)) {
+    cvs.releasePointerCapture(e.pointerId);
+  }
 }
 
 // ══════════════════════════════════════════════════
@@ -494,6 +587,7 @@ function resetAll() {
     ctxs[i]?.clearRect(0,0,canvases[i].width,canvases[i].height);
     states[i]=freshState();
     cell.classList.remove('complete','flash-s');
+    drawingStates[i] = { isDrawing: false, pointerId: null };
     updateFB(i);
   });
   doneCount=0; updateProg();
