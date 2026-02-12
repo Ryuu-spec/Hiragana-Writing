@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>히라가나 10칸 연습 도구</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: transparent; 
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+        .canvas-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        canvas {
+            background-color: transparent; 
+            cursor: crosshair;
+            touch-action: none;
+            width: 100%;
+            height: 85%;
+        }
+        .ui-overlay {
+            position: absolute;
+            bottom: 15px;
+            width: 90%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+        }
+        .status-badge {
+            background: rgba(46, 134, 222, 0.9);
+            color: white;
+            padding: 6px 18px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            pointer-events: auto;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .reset-btn {
+            background: rgba(255, 107, 107, 0.9);
+            color: white;
+            border: none;
+            padding: 6px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            pointer-events: auto;
+            font-weight: bold;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .reset-btn:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body>
+
+<div class="canvas-container">
+    <canvas id="paintCanvas"></canvas>
+    
+    <div class="ui-overlay">
+        <div class="status-badge" id="info">연습할 칸에 글자를 써보세요</div>
+        <button class="reset-btn" onclick="resetAll()">전체 지우기</button>
+    </div>
+</div>
+
+<script>
+    /**
+     * GitHub 사용자를 위한 팁:
+     * 이 파일명을 'index.html'로 해서 저장하고 깃허브 레포지토리에 올린 뒤,
+     * GitHub Pages 설정을 켜면 웹 주소(URL)가 생성됩니다.
+     */
+
+    const canvas = document.getElementById('paintCanvas');
+    const ctx = canvas.getContext('2d');
+    const info = document.getElementById('info');
+    
+    let isDrawing = false;
+    
+    // 10개 칸의 상태 관리 (5열 2행 기준)
+    const gridCols = 5;
+    const gridRows = 2;
+    let gridData = Array.from({ length: 10 }, () => ({
+        currentStroke: 0,
+        pointsReached: 0,
+        complete: false,
+        // 각 칸별로 체크포인트 상태를 복사해서 가짐
+        strokes: null 
+    }));
+
+    // 글자 데이터 라이브러리 (필요한 글자를 여기에 추가하세요)
+    const charLibrary = {
+        'A': {
+            strokes: [
+                { points: [{x:0.25, y:0.4}, {x:0.75, y:0.4}], reachedCount: 0 }, 
+                { points: [{x:0.5, y:0.2}, {x:0.5, y:0.8}], reachedCount: 0 },
+                { points: [{x:0.7, y:0.3}, {x:0.3, y:0.7}, {x:0.8, y:0.6}], reachedCount: 0 }
+            ]
+        }
+    };
+
+    // 현재 페이지의 목표 글자 설정
+    const currentChar = 'A'; 
+
+    function initGrid() {
+        gridData.forEach(data => {
+            // 깊은 복사를 통해 각 칸마다 독립적인 체크포인트 상태 부여
+            data.strokes = JSON.parse(JSON.stringify(charLibrary[currentChar].strokes));
+            data.currentStroke = 0;
+            data.pointsReached = 0;
+            data.complete = false;
+        });
+    }
+
+    function resize() {
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+    initGrid();
+
+    function getPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return {
+            x: clientX - rect.left,
+            y: clientY - rect.top
+        };
+    }
+
+    function getGridIndex(x, y) {
+        const colWidth = canvas.width / gridCols;
+        const rowHeight = canvas.height / gridRows;
+        const col = Math.floor(x / colWidth);
+        const row = Math.floor(y / rowHeight);
+        return row * gridCols + col;
+    }
+
+    function startDrawing(e) {
+        isDrawing = true;
+        ctx.beginPath();
+        const pos = getPos(e);
+        ctx.moveTo(pos.x, pos.y);
+    }
+
+    function draw(e) {
+        if (!isDrawing) return;
+        const pos = getPos(e);
+        const idx = getGridIndex(pos.x, pos.y);
+        
+        if (idx >= 0 && idx < 10) {
+            ctx.lineTo(pos.x, pos.y);
+            ctx.lineWidth = 12;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = '#333';
+            ctx.stroke();
+            
+            checkAccuracy(idx, pos.x, pos.y);
+        }
+    }
+
+    function checkAccuracy(idx, x, y) {
+        const state = gridData[idx];
+        if (!state || state.complete) return;
+
+        const colWidth = canvas.width / gridCols;
+        const rowHeight = canvas.height / gridRows;
+        
+        const relX = (x % colWidth) / colWidth;
+        const relY = (y % rowHeight) / rowHeight;
+
+        const stroke = state.strokes[state.currentStroke];
+        if (!stroke) return;
+
+        const nextPtIdx = stroke.points.findIndex(p => !p.reached);
+        if (nextPtIdx !== -1) {
+            const target = stroke.points[nextPtIdx];
+            const dist = Math.hypot(target.x - relX, target.y - relY);
+            
+            if (dist < 0.18) { // 인식 감도 조절 (0.15~0.2 권장)
+                target.reached = true;
+                state.pointsReached++;
+                
+                let totalPts = 0;
+                state.strokes.forEach(s => totalPts += s.points.length);
+                const acc = Math.round((state.pointsReached / totalPts) * 100);
+                
+                info.innerText = `${idx + 1}번 칸 정확도: ${acc}%`;
+
+                if (stroke.points.every(p => p.reached)) {
+                    state.currentStroke++;
+                }
+
+                if (acc >= 100) {
+                    state.complete = true;
+                    info.innerText = `${idx + 1}번 칸 완성! 아주 잘했어요 ✨`;
+                }
+            }
+        }
+    }
+
+    function resetAll() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        initGrid();
+        info.innerText = "전체 지워짐. 다시 시작!";
+    }
+
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    window.addEventListener('mouseup', () => isDrawing = false);
+    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDrawing(e); });
+    canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e); });
+    canvas.addEventListener('touchend', () => isDrawing = false);
+
+</script>
+</body>
+</html>
