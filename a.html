@@ -57,14 +57,13 @@ html, body {
 */
 .grid-overlay {
   position: absolute;
-  left:   51.875%;
-  top:    25.333%;
-  width:  45.938%;
-  height: 61.889%;
+  left:   52.404%;
+  top:    26.716%;
+  width:  45.467%;
+  height: 66.667%;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   grid-template-rows: repeat(4, 1fr);
-  /* 셀 간격: PDF에서 약 6px / 1600px = 0.375% */
   gap: 0.45%;
   background: transparent;
 }
@@ -108,36 +107,36 @@ html, body {
 .pips { display: flex; gap: 2px; align-items: center; }
 
 .pip {
-  width: 5px; height: 5px;
+  width: 4px; height: 4px;
   border-radius: 50%;
-  background: rgba(180,180,200,0.5);
+  background: rgba(180,180,200,0.4);
   transition: background 0.2s;
   flex-shrink: 0;
 }
-.pip.done    { background: #27ae60; }
-.pip.current { background: #f39c12; animation: blink 0.8s infinite; }
+.pip.done    { background: rgba(39,174,96,0.8); }
+.pip.current { background: rgba(243,156,18,0.9); animation: blink 0.8s infinite; }
 
 @keyframes blink {
   0%,100% { opacity:1; }
-  50%     { opacity:0.4; }
+  50%     { opacity:0.3; }
 }
 
 /* 정확도 배지 */
 .acc {
   font-family: 'Noto Sans KR', sans-serif;
-  font-size: clamp(7px, 0.7vw, 11px);
+  font-size: clamp(6px, 0.55vw, 9px);
   font-weight: 900;
-  border-radius: 8px;
-  padding: 1px 4px;
+  border-radius: 6px;
+  padding: 1px 3px;
   color: white;
-  background: rgba(150,150,170,0.7);
+  background: rgba(150,150,170,0.0);
   line-height: 1.3;
   white-space: nowrap;
 }
-.acc.great { background: rgba(39,174,96,0.85); }
-.acc.good  { background: rgba(59,130,246,0.85); }
-.acc.ok    { background: rgba(243,156,18,0.85); }
-.acc.poor  { background: rgba(230,57,70,0.85); }
+.acc.great { background: rgba(39,174,96,0.75); }
+.acc.good  { background: rgba(59,130,246,0.75); }
+.acc.ok    { background: rgba(243,156,18,0.75); }
+.acc.poor  { background: rgba(230,57,70,0.75); }
 
 /* 현재 획 힌트 (셀 우하단) */
 .stroke-hint {
@@ -145,11 +144,12 @@ html, body {
   bottom: 2px; right: 3px;
   z-index: 5;
   font-family: 'Noto Sans KR', sans-serif;
-  font-size: clamp(6px, 0.6vw, 10px);
+  font-size: clamp(5px, 0.5vw, 8px);
   font-weight: 900;
   pointer-events: none;
   line-height: 1;
-  text-shadow: 0 0 3px white, 0 0 6px white;
+  opacity: 0.7;
+  text-shadow: 0 0 4px white, 0 0 8px white;
 }
 
 /* 완성 체크마크 */
@@ -305,7 +305,7 @@ function getChar() {
 const CURRENT_CHAR = getChar();
 const TOTAL = 20;
 const TOLERANCE = 0.17;
-const STROKE_W   = 0.055;
+const STROKE_W   = 0.035;  // 얇게
 
 let cells=[], canvases=[], ctxs=[], states=[];
 let drawing=false, activeIdx=-1, doneCount=0;
@@ -415,7 +415,7 @@ function moveDraw(e,idx) {
   cx.lineTo(px,py);
   cx.lineWidth=Math.min(cvs.width,cvs.height)*STROKE_W;
   cx.lineCap='round'; cx.lineJoin='round';
-  cx.strokeStyle=d.strokes[st.si]?.color||'#1a1a2e';
+  cx.strokeStyle = 'rgba(26,26,46,0.75)';  // 반투명 먹색
   cx.stroke(); cx.beginPath(); cx.moveTo(px,py);
   checkHit(idx,p.x,p.y);
 }
