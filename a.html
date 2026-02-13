@@ -22,7 +22,7 @@ html, body {
 /* ── 획 인디케이터 ── */
 #dots {
   position: absolute;
-  left: 634px; top: 150px;
+  left: 647px; top: 168px;
   display: flex; gap: 8px;
   pointer-events: none; z-index: 90;
 }
@@ -41,16 +41,16 @@ html, body {
 /* ── 격자 ── */
 #grid {
   position: absolute;
-  left: 634px; top: 186px;
-  width: 538px; height: 424px;
+  left: 647px; top: 206px;
+  width: 483px; height: 381px;
   display: grid;
-  grid-template-columns: repeat(5, 107.6px);
-  grid-template-rows: repeat(4, 106px);
+  grid-template-columns: repeat(5, 96.6px);
+  grid-template-rows: repeat(4, 95.25px);
   background: transparent;
 }
 .cell {
   position: relative;
-  width: 107.6px; height: 106px;
+  width: 96.6px; height: 95.25px;
   cursor: crosshair;
   background: transparent;
   touch-action: none;
@@ -69,8 +69,7 @@ html, body {
 }
 .cell canvas {
   position: absolute; top:0; left:0;
-  /* CSS 표시 크기 = 셀 크기 */
-  width: 107.6px; height: 106px;
+  width: 96.6px; height: 95.25px;
   touch-action: none;
   display: block;
 }
@@ -78,7 +77,7 @@ html, body {
 /* ── 컨트롤 ── */
 #ctrl {
   position: absolute;
-  top: 622px; left: 634px;
+  top: 598px; left: 647px;
   display: flex; gap: 10px; z-index: 90;
 }
 .btn {
@@ -94,7 +93,7 @@ html, body {
 
 /* ── 토스트 ── */
 #toast {
-  position:absolute; left:50%; top:72px;
+  position:absolute; left:889px; top:155px;
   transform:translateX(-50%);
   padding:9px 24px; border-radius:18px;
   font-size:14px; font-weight:800;
@@ -127,10 +126,10 @@ html, body {
 /* ══════════════════════════════════
    설정
 ══════════════════════════════════ */
-const CELL_CSS_W = 107.6;   // CSS 픽셀
-const CELL_CSS_H = 106;
-const CVS_W = 216;           // 캔버스 내부 해상도 (2× 선명도)
-const CVS_H = 212;
+const CELL_CSS_W = 96.6;
+const CELL_CSS_H = 95.25;
+const CVS_W = 194;   // 2× 해상도
+const CVS_H = 191;
 const SCALE_X = CVS_W / CELL_CSS_W;  // ~2.0
 const SCALE_Y = CVS_H / CELL_CSS_H;
 
