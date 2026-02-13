@@ -2,520 +2,376 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>あ 쓰기 연습 오버레이 v2</title>
+<title>あ 쓰기 연습</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
-
-body {
-  width: 1200px;
-  height: 675px;
+html, body {
+  width: 1200px; height: 675px;
   overflow: hidden;
   background: transparent;
-  font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
   user-select: none;
+  -webkit-user-select: none;
 }
-
 #app {
   position: relative;
-  width: 1200px;
-  height: 675px;
+  width: 1200px; height: 675px;
   background: transparent;
 }
 
-/* ── 획 인디케이터 (상단 슬라이드 제목 아래) ── */
-#stroke-bar {
+/* ── 획 인디케이터 ── */
+#dots {
   position: absolute;
-  left: 642px;
-  top: 162px;
-  display: flex;
-  gap: 7px;
-  z-index: 80;
-  pointer-events: none;
+  left: 634px; top: 150px;
+  display: flex; gap: 8px;
+  pointer-events: none; z-index: 90;
 }
-.sdot {
-  width: 30px; height: 30px;
+.dot {
+  width: 32px; height: 32px;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 900; color: white;
-  opacity: 0.3;
-  transition: opacity .3s, transform .3s, box-shadow .3s;
-  box-shadow: 0 2px 6px rgba(0,0,0,.2);
+  font-size: 14px; font-weight: 900; color: #fff;
+  opacity: .25; transition: opacity .3s, transform .3s;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
 }
-.sdot.active  { opacity: 1; transform: scale(1.25); box-shadow: 0 4px 12px rgba(0,0,0,.35); }
-.sdot.done    { opacity: 0.85; }
-#sd1 { background: #3B82F6; }
-#sd2 { background: #10B981; }
-#sd3 { background: #F59E0B; }
+.dot.on   { opacity:1; transform:scale(1.3); }
+.dot.done { opacity:.8; }
+#d1{background:#3B82F6;} #d2{background:#10B981;} #d3{background:#F59E0B;}
 
-/* ── 격자 오버레이 ── */
+/* ── 격자 ── */
 #grid {
   position: absolute;
-  left: 642px;
-  top: 197px;
-  width: 493px;
-  height: 389px;
+  left: 634px; top: 186px;
+  width: 538px; height: 424px;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  grid-template-rows: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 107.6px);
+  grid-template-rows: repeat(4, 106px);
   background: transparent;
 }
-
 .cell {
   position: relative;
+  width: 107.6px; height: 106px;
   cursor: crosshair;
   background: transparent;
   touch-action: none;
 }
-
+.cell.active::before {
+  content:''; position:absolute; inset:2px;
+  border: 2px dashed rgba(59,130,246,.6);
+  border-radius: 3px; pointer-events:none;
+  animation: blink 1s linear infinite;
+}
+@keyframes blink { 50%{border-color:rgba(59,130,246,1);} }
+.badge {
+  position:absolute; bottom:3px; right:5px;
+  font-size:16px; font-weight:900;
+  pointer-events:none; line-height:1;
+}
 .cell canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%; height: 100%;
-  background: transparent;
+  position: absolute; top:0; left:0;
+  /* CSS 표시 크기 = 셀 크기 */
+  width: 107.6px; height: 106px;
+  touch-action: none;
+  display: block;
 }
 
-/* 셀 활성 링 */
-.cell.is-active::before {
-  content:'';
-  position: absolute;
-  inset: 2px;
-  border: 2px dashed rgba(59,130,246,.55);
-  border-radius: 3px;
-  pointer-events: none;
-  animation: dashPulse 1.2s linear infinite;
-}
-@keyframes dashPulse {
-  to { border-color: rgba(59,130,246,1); }
-}
-
-/* 결과 배지 */
-.cell .badge {
-  position: absolute;
-  bottom: 3px; right: 4px;
-  font-size: 15px;
-  font-weight: 900;
-  pointer-events: none;
-  line-height: 1;
-}
-
-/* ── 하단 컨트롤 ── */
+/* ── 컨트롤 ── */
 #ctrl {
   position: absolute;
-  bottom: 14px;
-  left: 642px;
-  display: flex;
-  gap: 10px;
-  z-index: 80;
+  bottom: 10px; left: 634px;
+  display: flex; gap: 10px; z-index: 90;
 }
-.cbtn {
-  padding: 7px 18px;
-  border: none;
-  border-radius: 22px;
-  font-size: 12px;
-  font-weight: 800;
-  cursor: pointer;
-  letter-spacing: .3px;
+.btn {
+  padding: 8px 20px; border:none; border-radius:22px;
+  font-size:13px; font-weight:800; cursor:pointer;
   transition: opacity .15s, transform .15s;
 }
-.cbtn:hover  { opacity: .82; transform: translateY(-1px); }
-.cbtn:active { transform: translateY(0); }
-#bClear { background:#EF4444; color:#fff; }
+.btn:hover  { opacity:.82; transform:translateY(-1px); }
+.btn:active { transform:translateY(0); }
 #bUndo  { background:#8B5CF6; color:#fff; }
+#bClear { background:#EF4444; color:#fff; }
 
-/* ── 피드백 토스트 ── */
+/* ── 토스트 ── */
 #toast {
-  position: absolute;
-  left: 50%; top: 80px;
-  transform: translateX(-50%);
-  padding: 9px 22px;
-  border-radius: 18px;
-  font-size: 14px; font-weight: 800;
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity .25s;
-  z-index: 200;
-  box-shadow: 0 4px 20px rgba(0,0,0,.22);
+  position:absolute; left:50%; top:72px;
+  transform:translateX(-50%);
+  padding:9px 24px; border-radius:18px;
+  font-size:14px; font-weight:800;
+  white-space:nowrap; pointer-events:none;
+  opacity:0; transition:opacity .2s; z-index:200;
+  box-shadow:0 4px 20px rgba(0,0,0,.2);
 }
-#toast.show { opacity: 1; }
-#toast.ok   { background: #10B981; color:#fff; }
-#toast.ng   { background: #EF4444; color:#fff; }
-#toast.info { background: rgba(255,255,255,.94); color:#333;
-               border: 1.5px solid #ddd; }
+#toast.show { opacity:1; }
+.t-ok   { background:#10B981; color:#fff; }
+.t-ng   { background:#EF4444; color:#fff; }
+.t-info { background:rgba(255,255,255,.95); color:#333; border:1.5px solid #ddd; }
 </style>
 </head>
 <body>
 <div id="app">
-
-  <!-- 획 인디케이터 -->
-  <div id="stroke-bar">
-    <div class="sdot active" id="sd1">1</div>
-    <div class="sdot"        id="sd2">2</div>
-    <div class="sdot"        id="sd3">3</div>
+  <div id="dots">
+    <div class="dot on" id="d1">1</div>
+    <div class="dot"    id="d2">2</div>
+    <div class="dot"    id="d3">3</div>
   </div>
-
-  <!-- 격자 -->
   <div id="grid"></div>
-
-  <!-- 피드백 -->
   <div id="toast"></div>
-
-  <!-- 컨트롤 -->
   <div id="ctrl">
-    <button class="cbtn" id="bUndo">↩ 이전 획 지우기</button>
-    <button class="cbtn" id="bClear">🗑 전체 지우기</button>
+    <button class="btn" id="bUndo">↩ 이전 획 지우기</button>
+    <button class="btn" id="bClear">🗑 전체 지우기</button>
   </div>
 </div>
 
 <script>
-/* ════════════════════════════════════
+/* ══════════════════════════════════
    설정
-════════════════════════════════════ */
-const COLS = 5, ROWS = 4;
-const COLORS  = ['#3B82F6','#10B981','#F59E0B']; // 1·2·3획
-const WIDTHS  = [3.5, 3.5, 3.5];
-const MAX_STROKES = 3;
+══════════════════════════════════ */
+const CELL_CSS_W = 107.6;   // CSS 픽셀
+const CELL_CSS_H = 106;
+const CVS_W = 216;           // 캔버스 내부 해상도 (2× 선명도)
+const CVS_H = 212;
+const SCALE_X = CVS_W / CELL_CSS_W;  // ~2.0
+const SCALE_Y = CVS_H / CELL_CSS_H;
 
-/* ── あ 3획 기준 (정규화 0~1, 셀 내부) ──────────────
-  1획: 상단 가로획
-       · 시작 Y < 0.45  (상단 절반)
-       · 수평 우세 (spanX > spanY * 1.2)
-       · 오른쪽 방향 (endX > startX)
+const COLS=5, ROWS=4, TOTAL=COLS*ROWS, MAX_S=3;
+const COLORS=['#3B82F6','#10B981','#F59E0B'];
+const LW=4; // 획 굵기 (캔버스 픽셀)
 
-  2획: 중간 세로/사선획  
-       · 시작 X < 0.60 (왼쪽~중앙)
-       · 시작 Y: 0.25 ~ 0.65
-       · 수직 우세 또는 약간 사선
-       · 총 길이 ≥ 0.25 (충분히 긴 획)
+/* ══════════════════════════════════
+   셀 생성
+══════════════════════════════════ */
+const gridEl=document.getElementById('grid');
+const cells=[];
 
-  3획: 오른쪽 큰 원+꼬리
-       · 시작 X > 0.30 (오른쪽 절반 이상)
-       · 시작 Y < 0.55
-       · 획이 가장 길거나 곡률이 큼
-       · spanX + spanY 합이 가장 큼 (or ≥ 0.5)
-─────────────────────────────────── */
+for(let i=0;i<TOTAL;i++){
+  const div=document.createElement('div');
+  div.className='cell';
 
-/* ════════════════════════════════════
-   셀 초기화
-════════════════════════════════════ */
-const gridEl = document.getElementById('grid');
-const cellArr = [];  // { el, cvs, ctx, strokes[], pts[], drawing, done }
-
-for(let i=0;i<COLS*ROWS;i++){
-  const div = document.createElement('div');
-  div.className = 'cell';
-  div.dataset.i = i;
-
-  const cvs = document.createElement('canvas');
+  const cvs=document.createElement('canvas');
+  cvs.width=CVS_W;
+  cvs.height=CVS_H;
   div.appendChild(cvs);
   gridEl.appendChild(div);
 
-  const ctx = cvs.getContext('2d');
-  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const ctx=cvs.getContext('2d');
+  ctx.lineCap='round'; ctx.lineJoin='round';
 
-  cellArr.push({ el:div, cvs, ctx, strokes:[], pts:[], drawing:false, done:false });
+  cells.push({ el:div, cvs, ctx, strokes:[], pts:[], drawing:false, done:false });
 }
 
-/* canvas 실제 픽셀 크기 맞추기 */
-function resizeCells(){
-  cellArr.forEach(c=>{
-    const r = c.el.getBoundingClientRect();
-    c.cvs.width  = Math.round(r.width);
-    c.cvs.height = Math.round(r.height);
-    redraw(c);
-  });
+/* ══════════════════════════════════
+   활성 셀
+══════════════════════════════════ */
+let activeIdx=0;
+function activate(idx){
+  cells.forEach((c,i)=>c.el.classList.toggle('active',i===idx&&!c.done));
+  activeIdx=idx;
+  syncDots(cells[idx]?.strokes.length??0);
 }
-window.addEventListener('load', resizeCells);
+activate(0);
 
-/* ════════════════════════════════════
-   활성 셀 관리
-════════════════════════════════════ */
-let activeIdx = 0;
-
-function activateCell(idx){
-  cellArr.forEach((c,i)=>{
-    c.el.classList.toggle('is-active', i===idx && !c.done);
-  });
-  activeIdx = idx;
-  updateDots(cellArr[idx]?.strokes.length ?? 0);
-}
-activateCell(0);
-
-/* ════════════════════════════════════
-   획 인디케이터
-════════════════════════════════════ */
-function updateDots(n){
+/* ══════════════════════════════════
+   인디케이터
+══════════════════════════════════ */
+function syncDots(n){
   [1,2,3].forEach(i=>{
-    const d = document.getElementById('sd'+i);
-    d.classList.remove('active','done');
-    if(i < n+1)      d.classList.add('done');
-    else if(i===n+1) d.classList.add('active');
+    const d=document.getElementById('d'+i);
+    d.classList.remove('on','done');
+    if(i<n+1) d.classList.add('done');
+    else if(i===n+1) d.classList.add('on');
   });
 }
 
-/* ════════════════════════════════════
-   좌표 취득
-════════════════════════════════════ */
-function getXY(cvs, e){
-  const r = cvs.getBoundingClientRect();
-  const src = e.touches ? e.touches[0] : e;
-  return {
-    x:(src.clientX - r.left) * (cvs.width/r.width),
-    y:(src.clientY - r.top)  * (cvs.height/r.height)
-  };
+/* ══════════════════════════════════
+   포인터 좌표 → 캔버스 픽셀
+══════════════════════════════════ */
+function evPt(e, cvs){
+  const r=cvs.getBoundingClientRect();
+  const cx=(e.clientX-r.left)*(CVS_W/r.width);
+  const cy=(e.clientY-r.top)*(CVS_H/r.height);
+  return {x:cx, y:cy};
 }
 
-/* ════════════════════════════════════
-   스무스 드로잉
-════════════════════════════════════ */
-function smooth(ctx, pts, color, w){
-  if(pts.length < 2) return;
+/* ══════════════════════════════════
+   드로잉
+══════════════════════════════════ */
+function drawCurve(ctx, pts, color){
+  if(pts.length<2) return;
   ctx.save();
-  ctx.strokeStyle = color; ctx.lineWidth = w;
+  ctx.strokeStyle=color; ctx.lineWidth=LW;
   ctx.beginPath();
-  ctx.moveTo(pts[0].x, pts[0].y);
+  ctx.moveTo(pts[0].x,pts[0].y);
   for(let i=1;i<pts.length-1;i++){
     const mx=(pts[i].x+pts[i+1].x)/2, my=(pts[i].y+pts[i+1].y)/2;
     ctx.quadraticCurveTo(pts[i].x,pts[i].y,mx,my);
   }
-  ctx.lineTo(pts[pts.length-1].x, pts[pts.length-1].y);
+  ctx.lineTo(pts[pts.length-1].x,pts[pts.length-1].y);
   ctx.stroke();
-  // 시작점 원
   ctx.beginPath();
-  ctx.arc(pts[0].x, pts[0].y, w*1.1, 0, Math.PI*2);
-  ctx.fillStyle = color; ctx.fill();
+  ctx.arc(pts[0].x,pts[0].y,LW*1.1,0,Math.PI*2);
+  ctx.fillStyle=color; ctx.fill();
   ctx.restore();
 }
 
 function redraw(c){
-  c.ctx.clearRect(0,0,c.cvs.width,c.cvs.height);
-  c.strokes.forEach((s,i)=> smooth(c.ctx, s, COLORS[i], WIDTHS[i]));
+  c.ctx.clearRect(0,0,CVS_W,CVS_H);
+  c.strokes.forEach((s,i)=>drawCurve(c.ctx,s,COLORS[i]));
 }
 
-/* ════════════════════════════════════
-   획순 분석  ★ 핵심
-════════════════════════════════════ */
-function feat(pts, W, H){
-  if(!pts||pts.length<2) return null;
+/* ══════════════════════════════════
+   획순 분석
+══════════════════════════════════ */
+function getFeatures(pts){
+  const W=CVS_W, H=CVS_H;
   const xs=pts.map(p=>p.x), ys=pts.map(p=>p.y);
   const minX=Math.min(...xs), maxX=Math.max(...xs);
   const minY=Math.min(...ys), maxY=Math.max(...ys);
   const spanX=(maxX-minX)/W, spanY=(maxY-minY)/H;
-
-  // 총 획 길이 (픽셀 합산, 정규화)
   let len=0;
   for(let i=1;i<pts.length;i++){
     const dx=pts[i].x-pts[i-1].x, dy=pts[i].y-pts[i-1].y;
     len+=Math.sqrt(dx*dx+dy*dy);
   }
-  len /= (W+H)/2;
-
-  // 곡률 추정: 방향 변화 횟수
-  let turns=0;
-  for(let i=2;i<pts.length;i++){
-    const ax=pts[i-1].x-pts[i-2].x, ay=pts[i-1].y-pts[i-2].y;
-    const bx=pts[i].x-pts[i-1].x,   by=pts[i].y-pts[i-1].y;
-    const cross=ax*by-ay*bx;
-    if(i>2){
-      const ax2=pts[i-2].x-pts[i-3].x, ay2=pts[i-2].y-pts[i-3].y;
-      const cross2=ax2*by-ay2*bx;
-      if(cross*cross2<0) turns++;
-    }
-  }
-
   return {
-    sX: pts[0].x/W, sY: pts[0].y/H,   // 시작점 정규화
-    eX: pts[pts.length-1].x/W, eY: pts[pts.length-1].y/H,
-    spanX, spanY,
-    cX: (minX+maxX)/(2*W), cY: (minY+maxY)/(2*H),  // 중심
-    len, turns,
-    horiz: spanX > spanY*1.15,
-    vert:  spanY > spanX*1.05,
+    sX:pts[0].x/W, sY:pts[0].y/H,
+    eX:pts[pts.length-1].x/W, eY:pts[pts.length-1].y/H,
+    spanX, spanY, len:len/(W+H)*2,
+    horiz:spanX>spanY*1.05,
+    vert:spanY>spanX*0.85,
+    cX:(minX+maxX)/(2*W), cY:(minY+maxY)/(2*H),
   };
 }
 
-function checkStrokes(strokes, W, H){
-  if(strokes.length !== MAX_STROKES) return null;
+function judge(strokes){
+  if(strokes.length!==3) return null;
+  const [f0,f1,f2]=strokes.map(getFeatures);
+  const errs=[]; let sc=0;
 
-  const [f0, f1, f2] = strokes.map(s => feat(s, W, H));
-  const errs = [];
-  let score = 0;  // 0~3
-
-  /* ── 1획 검사: 상단 가로획 ──────────────────────
-     · 시작 Y < 0.48
-     · 가로 방향 (spanX > spanY*1.1 OR spanX > 0.3)
-     · 오른쪽으로 향함 (eX > sX - 0.1)
-  ─────────────────────────────────────────────── */
-  const ok1_startY = f0.sY < 0.50;
-  const ok1_horiz  = f0.spanX > 0.28 || f0.horiz;
-  const ok1_dir    = f0.eX >= f0.sX - 0.15;  // 오른쪽 방향
-
-  if(ok1_startY && ok1_horiz && ok1_dir){
-    score++;
+  // 1획: 상단 가로획 (Y<0.52, 가로방향, 오른쪽)
+  if(f0.sY<0.52 && (f0.horiz||f0.spanX>0.22) && f0.eX>=f0.sX-0.25){
+    sc++;
   } else {
-    if(!ok1_startY) errs.push('1획은 위쪽(상단)에서 시작해야 해요');
-    else if(!ok1_horiz) errs.push('1획은 가로로 그어야 해요');
-    else if(!ok1_dir)   errs.push('1획은 오른쪽 방향으로 그어야 해요');
+    if(f0.sY>=0.52)           errs.push('1획은 위쪽에서 가로로 그어야 해요');
+    else if(!f0.horiz&&f0.spanX<=0.22) errs.push('1획은 가로 방향으로 그어야 해요');
+    else                       errs.push('1획은 오른쪽 방향으로 그어야 해요');
   }
 
-  /* ── 2획 검사: 중간 세로/사선획 ────────────────
-     · 시작 X < 0.65 (왼쪽~중앙)
-     · 시작 Y 0.20 ~ 0.68
-     · 세로 방향 우세 OR 대각선 (spanY > 0.25)
-     · 1획 시작보다 Y가 아래에 있음
-  ─────────────────────────────────────────────── */
-  const ok2_startX  = f1.sX < 0.68;
-  const ok2_startY  = f1.sY > 0.15 && f1.sY < 0.72;
-  const ok2_vert    = f1.spanY > 0.22;
-  const ok2_order   = f1.sY >= f0.sY - 0.15;  // 1획보다 너무 위이면 안됨
-
-  if(ok2_startX && ok2_startY && ok2_vert && ok2_order){
-    score++;
+  // 2획: 세로/사선 (X<0.72, 적절한 Y 범위, 아래 방향)
+  if(f1.sX<0.75 && f1.sY>0.10 && f1.sY<0.75 && (f1.vert||f1.spanY>0.18)){
+    sc++;
   } else {
-    if(!ok2_startX)  errs.push('2획은 왼쪽(중앙)에서 시작해야 해요');
-    else if(!ok2_startY) errs.push('2획의 시작 위치를 조정해 주세요');
-    else if(!ok2_vert)   errs.push('2획은 아래로 내려그어야 해요');
-    else if(!ok2_order)  errs.push('2획은 1획 이후에 그어야 해요');
+    if(f1.sX>=0.75)            errs.push('2획은 더 왼쪽(중앙)에서 시작해야 해요');
+    else if(!(f1.vert||f1.spanY>0.18)) errs.push('2획은 아래 방향으로 내려그어야 해요');
+    else                        errs.push('2획 시작 위치를 조정해 주세요');
   }
 
-  /* ── 3획 검사: 오른쪽 큰 원+꼬리 ───────────────
-     · 시작 X > 0.25 (중앙 이상)
-     · 시작 Y < 0.62
-     · 획 길이 가장 김 (세 획 중 max)
-       OR spanX+spanY 가 가장 큼
-     · 1획·2획보다 복잡 (len 기준)
-  ─────────────────────────────────────────────── */
-  const ok3_startX = f2.sX > 0.20;
-  const ok3_startY = f2.sY < 0.65;
-  const lens = [f0.len, f1.len, f2.len];
-  const ok3_longest = f2.len >= Math.max(...lens)*0.75;  // 가장 길거나 비슷한 길이
-  const ok3_span    = (f2.spanX+f2.spanY) >= Math.max(f0.spanX+f0.spanY, f1.spanX+f1.spanY)*0.7;
-
-  if(ok3_startX && ok3_startY && (ok3_longest || ok3_span)){
-    score++;
+  // 3획: 큰 원+꼬리 (X>0.15, Y<0.68, 가장 복잡)
+  const maxLen=Math.max(f0.len,f1.len,f2.len);
+  const bigSpan=(f2.spanX+f2.spanY)>=(Math.max(f0.spanX+f0.spanY,f1.spanX+f1.spanY)*0.65);
+  if(f2.sX>0.12 && f2.sY<0.70 && (f2.len>=maxLen*0.65||bigSpan)){
+    sc++;
   } else {
-    if(!ok3_startX)   errs.push('3획은 오른쪽에서 시작해야 해요');
-    else if(!ok3_startY) errs.push('3획의 시작점을 위로 올려주세요');
-    else              errs.push('3획을 더 크게 그려주세요 (큰 원+꼬리)');
+    if(f2.sX<=0.12)            errs.push('3획은 오른쪽에서 시작해야 해요');
+    else if(f2.sY>=0.70)       errs.push('3획은 좀 더 위에서 시작해야 해요');
+    else                        errs.push('3획을 더 크게 그려주세요 (큰 원+꼬리)');
   }
 
-  return { score, errs, correct: score === 3 };
+  return {sc, errs, ok:sc===3};
 }
 
-/* ════════════════════════════════════
-   토스트 메시지
-════════════════════════════════════ */
-let toastTimer;
-function toast(msg, type='info', ms=1800){
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.className = `show ${type}`;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=>{ el.className=''; }, ms);
+/* ══════════════════════════════════
+   토스트
+══════════════════════════════════ */
+let tTimer;
+function toast(msg,type='info',ms=1800){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className=`show t-${type}`;
+  clearTimeout(tTimer);
+  tTimer=setTimeout(()=>{el.className='';},ms);
 }
 
-/* ════════════════════════════════════
-   이벤트 등록
-════════════════════════════════════ */
-cellArr.forEach((c, idx)=>{
-  const {cvs} = c;
+/* ══════════════════════════════════
+   이벤트 (Pointer Events API)
+══════════════════════════════════ */
+cells.forEach((c,idx)=>{
+  const {cvs}=c;
 
-  function onStart(e){
+  cvs.addEventListener('pointerdown',e=>{
     e.preventDefault();
-    if(c.done) return;
-    activateCell(idx);
-    if(c.strokes.length >= MAX_STROKES){
-      toast('3획 완료! ↩ 버튼으로 되돌리거나 전체 지우기 하세요','info'); return;
-    }
-    c.drawing = true;
-    c.pts = [getXY(cvs, e)];
-  }
+    cvs.setPointerCapture(e.pointerId);
+    if(c.done){ toast('이미 완성한 칸이에요','info'); return; }
+    activate(idx);
+    if(c.strokes.length>=MAX_S){ toast('3획 완료! ↩ 버튼으로 되돌리세요','info'); return; }
+    c.drawing=true;
+    c.pts=[evPt(e,cvs)];
+  },{passive:false});
 
-  function onMove(e){
+  cvs.addEventListener('pointermove',e=>{
     e.preventDefault();
     if(!c.drawing) return;
-    c.pts.push(getXY(cvs, e));
+    c.pts.push(evPt(e,cvs));
     redraw(c);
-    smooth(c.ctx, c.pts, COLORS[c.strokes.length], WIDTHS[c.strokes.length]);
-  }
+    drawCurve(c.ctx,c.pts,COLORS[c.strokes.length]);
+  },{passive:false});
 
-  function onEnd(e){
-    e.preventDefault();
+  function end(e){
     if(!c.drawing) return;
-    c.drawing = false;
-    if(c.pts.length < 4){ c.pts=[]; return; }
+    c.drawing=false;
+    if(c.pts.length<4){ c.pts=[]; return; }
 
     c.strokes.push([...c.pts]);
-    c.pts = [];
+    c.pts=[];
     redraw(c);
-    updateDots(c.strokes.length);
+    syncDots(c.strokes.length);
 
-    if(c.strokes.length === MAX_STROKES){
-      const W=c.cvs.width, H=c.cvs.height;
-      const res = checkStrokes(c.strokes, W, H);
-
-      // 배지 제거 후 재생성
+    if(c.strokes.length===MAX_S){
+      const res=judge(c.strokes);
       c.el.querySelectorAll('.badge').forEach(b=>b.remove());
-      const badge = document.createElement('div');
-      badge.className = 'badge';
-
-      if(res.correct){
-        badge.textContent = '✓';
-        badge.style.color = '#10B981';
-        c.el.classList.remove('is-active');
-        c.done = true;
-        toast('🎉 획순 완벽! 잘 썼어요!','ok', 2200);
-        // 자동 다음 셀
-        const next = cellArr.findIndex((cc,i)=> i>idx && !cc.done);
-        if(next !== -1) setTimeout(()=> activateCell(next), 900);
+      const badge=document.createElement('div');
+      badge.className='badge';
+      if(res.ok){
+        badge.textContent='✓'; badge.style.color='#10B981';
+        c.done=true; c.el.classList.remove('active');
+        toast('🎉 획순 완벽해요!','ok',2500);
+        const nxt=cells.findIndex((cc,i)=>i>idx&&!cc.done);
+        if(nxt!==-1) setTimeout(()=>activate(nxt),800);
       } else {
-        badge.textContent = '✗';
-        badge.style.color = '#EF4444';
-        const msg = res.errs[0] || '획순을 다시 확인해 보세요';
-        toast(`⚠️ ${msg}`,'ng', 3000);
+        badge.textContent='✗'; badge.style.color='#EF4444';
+        toast('⚠️ '+res.errs[0],'ng',3200);
       }
       c.el.appendChild(badge);
     } else {
-      const left = MAX_STROKES - c.strokes.length;
-      toast(`${c.strokes.length}획 완료 ✓  남은 획: ${left}개`,'info',1200);
+      toast(`${c.strokes.length}획 완료 ✓  남은 획: ${MAX_S-c.strokes.length}개`,'info',1000);
     }
   }
 
-  cvs.addEventListener('mousedown', onStart);
-  cvs.addEventListener('mousemove', onMove);
-  cvs.addEventListener('mouseup',   onEnd);
-  cvs.addEventListener('mouseleave',onEnd);
-  cvs.addEventListener('touchstart', onStart,{passive:false});
-  cvs.addEventListener('touchmove',  onMove, {passive:false});
-  cvs.addEventListener('touchend',   onEnd,  {passive:false});
+  cvs.addEventListener('pointerup',end,{passive:false});
+  cvs.addEventListener('pointercancel',end,{passive:false});
 });
 
-/* ── 이전 획 지우기 ── */
+/* ── 버튼 ── */
 document.getElementById('bUndo').addEventListener('click',()=>{
-  const c = cellArr[activeIdx];
-  if(!c || c.strokes.length === 0){ toast('지울 획이 없어요','info'); return; }
-  c.strokes.pop();
-  c.done = false;
+  const c=cells[activeIdx];
+  if(!c||c.strokes.length===0){ toast('지울 획이 없어요','info'); return; }
+  c.strokes.pop(); c.done=false;
   c.el.querySelectorAll('.badge').forEach(b=>b.remove());
-  c.el.classList.add('is-active');
-  redraw(c);
-  updateDots(c.strokes.length);
-  toast(`↩ ${c.strokes.length+1}획 취소`,'info',1000);
+  c.el.classList.add('active');
+  redraw(c); syncDots(c.strokes.length);
+  toast('↩ 마지막 획 취소','info',900);
 });
 
-/* ── 전체 지우기 ── */
 document.getElementById('bClear').addEventListener('click',()=>{
-  cellArr.forEach(c=>{
+  cells.forEach(c=>{
     c.strokes=[]; c.pts=[]; c.drawing=false; c.done=false;
     c.el.querySelectorAll('.badge').forEach(b=>b.remove());
-    c.el.classList.remove('is-active');
-    c.ctx.clearRect(0,0,c.cvs.width,c.cvs.height);
+    c.el.classList.remove('active');
+    c.ctx.clearRect(0,0,CVS_W,CVS_H);
   });
-  activateCell(0);
-  toast('🗑 전체 지웠어요! 다시 시작하세요','info',1500);
+  activate(0);
+  toast('🗑 전체 지웠어요!','info',1500);
 });
 
-updateDots(0);
+syncDots(0);
 </script>
 </body>
 </html>
