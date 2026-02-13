@@ -1,736 +1,555 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>히라가나 쓰기 피드백 도구 - 개선판</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1200">
+<title>あ 쓰기 연습 오버레이</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: #f3f4f6;
-            overflow: hidden;
-        }
+  body {
+    width: 1200px;
+    height: 675px;
+    overflow: hidden;
+    background: transparent;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
 
-        .container {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-        }
+  /* 전체 컨테이너 - Genially 슬라이드와 동일 사이즈 */
+  #container {
+    position: relative;
+    width: 1200px;
+    height: 675px;
+    background: transparent;
+  }
 
-        .header {
-            background: white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            padding: 1rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 1rem;
-        }
+  /* 격자 오버레이 영역 */
+  #grid-overlay {
+    position: absolute;
+    left: 637px;
+    top: 143px;
+    width: 514px;
+    height: 500px;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 0;
+    background: transparent;
+  }
 
-        h1 {
-            font-size: 1.5rem;
-            color: #1f2937;
-        }
+  /* 각 셀 */
+  .cell {
+    position: relative;
+    width: 102.8px;
+    height: 125px;
+    background: transparent;
+    cursor: crosshair;
+    overflow: hidden;
+  }
 
-        .button-group {
-            display: flex;
-            gap: 0.75rem;
-            flex-wrap: wrap;
-        }
+  /* 셀 내 캔버스 */
+  .cell canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+  }
 
-        button {
-            padding: 0.5rem 1rem;
-            border: none;
-            border-radius: 0.5rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-size: 0.875rem;
-        }
+  /* 획순 색깔 (あ 3획) */
+  /* 1획: 파란색, 2획: 초록색, 3획: 주황색 */
 
-        button:disabled {
-            background-color: #d1d5db;
-            cursor: not-allowed;
-            color: #6b7280;
-        }
+  /* 피드백 팝업 */
+  #feedback {
+    position: absolute;
+    top: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255,255,255,0.95);
+    border-radius: 16px;
+    padding: 12px 24px;
+    font-size: 15px;
+    font-weight: 700;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    display: none;
+    z-index: 100;
+    white-space: nowrap;
+    pointer-events: none;
+  }
 
-        .btn-feedback {
-            background-color: #e5e7eb;
-            color: #374151;
-        }
+  /* 컨트롤 패널 */
+  #controls {
+    position: absolute;
+    bottom: 8px;
+    left: 637px;
+    display: flex;
+    gap: 8px;
+    z-index: 50;
+  }
 
-        .btn-feedback:hover:not(:disabled) {
-            background-color: #d1d5db;
-        }
+  .ctrl-btn {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
 
-        .btn-feedback.active {
-            background-color: #3b82f6;
-            color: white;
-        }
+  .ctrl-btn:hover { opacity: 0.85; transform: translateY(-1px); }
 
-        .btn-feedback.active:hover {
-            background-color: #2563eb;
-        }
+  #btn-clear { background: #ff6b6b; color: white; }
+  #btn-check { background: #4ecdc4; color: white; }
 
-        .btn-clear-cell {
-            background-color: #f97316;
-            color: white;
-        }
+  /* 획순 인디케이터 */
+  #stroke-indicator {
+    position: absolute;
+    top: 108px;
+    left: 637px;
+    display: flex;
+    gap: 6px;
+    z-index: 50;
+  }
 
-        .btn-clear-cell:hover:not(:disabled) {
-            background-color: #ea580c;
-        }
+  .stroke-dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+    font-weight: 900;
+    color: white;
+    opacity: 0.35;
+    transition: opacity 0.3s, transform 0.3s;
+    border: 2px solid rgba(255,255,255,0.6);
+  }
 
-        .btn-clear-all {
-            background-color: #ef4444;
-            color: white;
-        }
+  .stroke-dot.active {
+    opacity: 1;
+    transform: scale(1.2);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
 
-        .btn-clear-all:hover {
-            background-color: #dc2626;
-        }
+  .stroke-dot.done {
+    opacity: 0.9;
+  }
 
-        .btn-undo {
-            background-color: #8b5cf6;
-            color: white;
-        }
+  #dot1 { background: #4A90E2; }
+  #dot2 { background: #27AE60; }
+  #dot3 { background: #E67E22; }
 
-        .btn-undo:hover:not(:disabled) {
-            background-color: #7c3aed;
-        }
+  /* 셀 활성화 표시 */
+  .cell.active-cell::after {
+    content: '';
+    position: absolute;
+    inset: 1px;
+    border: 2px solid rgba(74, 144, 226, 0.5);
+    border-radius: 4px;
+    pointer-events: none;
+    animation: pulse-border 1s ease infinite;
+  }
 
-        .main-content {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem;
-            overflow: auto;
-        }
+  @keyframes pulse-border {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
 
-        .canvas-wrapper {
-            position: relative;
-            display: inline-block;
-            line-height: 0;
-        }
+  /* 완료 효과 */
+  .cell.complete-correct::after {
+    content: '✓';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    padding: 4px;
+    font-size: 14px;
+    color: #27AE60;
+    font-weight: 900;
+    border: none;
+    animation: none;
+    pointer-events: none;
+  }
 
-        .background-image {
-            width: 100%;
-            height: auto;
-            display: block;
-            user-select: none;
-            -webkit-user-drag: none;
-        }
-
-        canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            cursor: crosshair;
-            touch-action: none;
-        }
-
-        .footer {
-            background: white;
-            border-top: 1px solid #e5e7eb;
-            padding: 1rem;
-        }
-
-        .footer-content {
-            max-width: 64rem;
-            margin: 0 auto;
-        }
-
-        .footer h2 {
-            font-size: 1.125rem;
-            margin-bottom: 0.5rem;
-            color: #1f2937;
-        }
-
-        .footer ul {
-            list-style: none;
-            font-size: 0.875rem;
-            color: #6b7280;
-        }
-
-        .footer li {
-            margin-bottom: 0.25rem;
-        }
-
-        .stroke-color {
-            font-weight: bold;
-        }
-
-        .stats-panel {
-            background: #f9fafb;
-            border-radius: 0.5rem;
-            padding: 0.75rem;
-            margin-top: 0.5rem;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 0.5rem;
-        }
-
-        .stat-item {
-            background: white;
-            padding: 0.5rem;
-            border-radius: 0.375rem;
-            text-align: center;
-        }
-
-        .stat-label {
-            font-size: 0.75rem;
-            color: #6b7280;
-            margin-bottom: 0.25rem;
-        }
-
-        .stat-value {
-            font-size: 1.25rem;
-            font-weight: bold;
-            color: #1f2937;
-        }
-
-        @media (max-width: 768px) {
-            h1 {
-                font-size: 1.25rem;
-            }
-
-            .header {
-                padding: 0.75rem;
-            }
-
-            .main-content {
-                padding: 1rem;
-            }
-
-            button {
-                padding: 0.4rem 0.8rem;
-                font-size: 0.8rem;
-            }
-
-            .stats-panel {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-    </style>
+  .cell.complete-wrong::after {
+    content: '↺';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    padding: 4px;
+    font-size: 14px;
+    color: #E74C3C;
+    font-weight: 900;
+    border: none;
+    animation: none;
+    pointer-events: none;
+  }
+</style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>히라가나 쓰기 피드백 도구</h1>
-            <div class="button-group">
-                <button id="btnFeedback" class="btn-feedback">피드백 보기</button>
-                <button id="btnUndo" class="btn-undo" disabled>실행 취소</button>
-                <button id="btnClearCell" class="btn-clear-cell" disabled>선택 칸 지우기</button>
-                <button id="btnClearAll" class="btn-clear-all">전체 지우기</button>
-            </div>
-        </div>
 
-        <div class="main-content">
-            <div class="canvas-wrapper" id="canvasWrapper">
-                <img 
-                    src="/mnt/user-data/uploads/001_00.jpg" 
-                    alt="히라가나 워크북"
-                    class="background-image"
-                    id="backgroundImage"
-                    draggable="false"
-                >
-                <canvas id="drawingCanvas"></canvas>
-            </div>
-        </div>
+<div id="container">
 
-        <div class="footer">
-            <div class="footer-content">
-                <h2>사용 방법</h2>
-                <ul>
-                    <li>• 오른쪽 4×5 그리드의 칸을 클릭/터치하여 글자를 쓰세요</li>
-                    <li>• 각 획은 자동으로 다른 색상으로 표시됩니다</li>
-                    <li>• "피드백 보기" 버튼을 눌러 정확도와 획수를 확인하세요</li>
-                    <li>• "あ"는 3획으로 이루어진 글자입니다 (왼쪽 곡선 → 오른쪽 세로 → 아래 가로)</li>
-                    <li id="strokeColors">• 획순 색상: <span class="stroke-color" style="color: #FF6B6B">1획</span>, <span class="stroke-color" style="color: #4ECDC4">2획</span>, <span class="stroke-color" style="color: #45B7D1">3획</span></li>
-                </ul>
-                
-                <div class="stats-panel" id="statsPanel" style="display: none;">
-                    <div class="stat-item">
-                        <div class="stat-label">총 획수</div>
-                        <div class="stat-value" id="statTotalStrokes">0</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">평균 정확도</div>
-                        <div class="stat-value" id="statAvgAccuracy">0%</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">완성된 칸</div>
-                        <div class="stat-value" id="statCompleted">0/20</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">3획 칸</div>
-                        <div class="stat-value" id="statPerfect">0</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+  <!-- 획순 인디케이터 -->
+  <div id="stroke-indicator">
+    <div class="stroke-dot active" id="dot1">1</div>
+    <div class="stroke-dot" id="dot2">2</div>
+    <div class="stroke-dot" id="dot3">3</div>
+  </div>
 
-    <script>
-        // 상수 정의
-        const IMAGE_WIDTH = 2000;
-        const IMAGE_HEIGHT = 1125;
-        const GRID_START_X = 1070;
-        const GRID_START_Y = 339;
-        const CELL_SIZE = 163;
-        const COLS = 5;
-        const ROWS = 4;
+  <!-- 격자 오버레이 (5열 × 4행 = 20칸) -->
+  <div id="grid-overlay"></div>
 
-        // 획순 색상
-        const STROKE_COLORS = [
-            '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
-            '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B195', '#A8E6CF'
-        ];
+  <!-- 피드백 -->
+  <div id="feedback"></div>
 
-        // "あ" 글자의 이상적인 획순 (정규화된 좌표, 0~1 범위)
-        const IDEAL_STROKES = [
-            // 1획: 왼쪽 곡선 (위에서 아래로)
-            [
-                {x: 0.3, y: 0.2},
-                {x: 0.28, y: 0.35},
-                {x: 0.25, y: 0.5},
-                {x: 0.27, y: 0.65},
-                {x: 0.32, y: 0.78}
-            ],
-            // 2획: 오른쪽 세로 (위에서 아래로)
-            [
-                {x: 0.7, y: 0.15},
-                {x: 0.68, y: 0.35},
-                {x: 0.66, y: 0.55},
-                {x: 0.65, y: 0.75},
-                {x: 0.65, y: 0.85}
-            ],
-            // 3획: 아래 가로 곡선 (왼쪽에서 오른쪽으로)
-            [
-                {x: 0.25, y: 0.75},
-                {x: 0.4, y: 0.72},
-                {x: 0.55, y: 0.7},
-                {x: 0.68, y: 0.73},
-                {x: 0.78, y: 0.8}
-            ]
-        ];
+  <!-- 컨트롤 -->
+  <div id="controls">
+    <button class="ctrl-btn" id="btn-clear">🗑 전체 지우기</button>
+    <button class="ctrl-btn" id="btn-check">✓ 획순 확인</button>
+  </div>
 
-        // 상태 변수
-        let canvas, ctx;
-        let isDrawing = false;
-        let strokes = {};
-        let currentStroke = [];
-        let selectedCell = null;
-        let showFeedback = false;
-        let history = [];
+</div>
 
-        // DOM 요소
-        const btnFeedback = document.getElementById('btnFeedback');
-        const btnUndo = document.getElementById('btnUndo');
-        const btnClearCell = document.getElementById('btnClearCell');
-        const btnClearAll = document.getElementById('btnClearAll');
-        const backgroundImage = document.getElementById('backgroundImage');
-        const statsPanel = document.getElementById('statsPanel');
+<script>
+// ===== 설정 =====
+const CELL_W = 102.8;
+const CELL_H = 125;
+const COLS = 5;
+const ROWS = 4;
+const TOTAL_CELLS = COLS * ROWS;
 
-        // 초기화
-        function init() {
-            canvas = document.getElementById('drawingCanvas');
-            ctx = canvas.getContext('2d');
+// あ 획순 정의 (정규화 좌표 0~1, 셀 기준)
+// 1획: 위쪽 가로 획 (오른쪽으로)
+// 2획: 왼쪽 세로+꺾임 획 (위에서 아래로, 왼쪽 커브)  
+// 3획: 오른쪽 큰 원+꼬리 획
 
-            setupCanvas();
-            setupEventListeners();
-            
-            window.addEventListener('resize', setupCanvas);
-        }
+const STROKE_COLORS = ['#4A90E2', '#27AE60', '#E67E22'];
+const STROKE_WIDTHS = [3, 3, 3];
+const TOTAL_STROKES = 3;
 
-        // 캔버스 설정
-        function setupCanvas() {
-            const wrapper = document.getElementById('canvasWrapper');
-            const img = backgroundImage;
-            
-            const scale = img.clientWidth / IMAGE_WIDTH;
-            
-            canvas.width = IMAGE_WIDTH;
-            canvas.height = IMAGE_HEIGHT;
-            canvas.style.width = `${IMAGE_WIDTH * scale}px`;
-            canvas.style.height = `${IMAGE_HEIGHT * scale}px`;
-            
-            redrawCanvas();
-        }
+// 획순 방향 기준 (시작점 Y 기준 정규화)
+// 1획: y < 0.4 시작, 수평 방향
+// 2획: y < 0.5 시작, 수직 방향  
+// 3획: 어디서든 가장 긴 획
 
-        // 이벤트 리스너 설정
-        function setupEventListeners() {
-            canvas.addEventListener('mousedown', startDrawing);
-            canvas.addEventListener('mousemove', draw);
-            canvas.addEventListener('mouseup', endDrawing);
-            canvas.addEventListener('mouseleave', endDrawing);
+// ===== 셀 생성 =====
+const gridEl = document.getElementById('grid-overlay');
+const cells = []; // { el, canvas, ctx, strokes: [{points}], currentStroke, strokeCount, isDrawing }
 
-            canvas.addEventListener('touchstart', startDrawing);
-            canvas.addEventListener('touchmove', draw);
-            canvas.addEventListener('touchend', endDrawing);
+for (let i = 0; i < TOTAL_CELLS; i++) {
+  const cell = document.createElement('div');
+  cell.className = 'cell';
+  cell.dataset.idx = i;
 
-            btnFeedback.addEventListener('click', toggleFeedback);
-            btnUndo.addEventListener('click', undo);
-            btnClearCell.addEventListener('click', clearSelectedCell);
-            btnClearAll.addEventListener('click', clearAll);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(CELL_W);
+  canvas.height = Math.round(CELL_H);
+  cell.appendChild(canvas);
 
-            backgroundImage.addEventListener('load', setupCanvas);
-        }
+  gridEl.appendChild(cell);
 
-        // 캔버스 좌표 가져오기
-        function getCanvasCoords(e) {
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
+  const ctx = canvas.getContext('2d');
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
 
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  cells.push({
+    el: cell,
+    canvas,
+    ctx,
+    strokes: [],       // 완성된 획들
+    currentPoints: [], // 현재 그리는 중인 획의 점들
+    isDrawing: false,
+    strokeCount: 0,
+    done: false,
+  });
+}
 
-            return {
-                x: (clientX - rect.left) * scaleX,
-                y: (clientY - rect.top) * scaleY
-            };
-        }
+// ===== 현재 활성 셀 =====
+let activeCellIdx = 0;
+setActiveCell(0);
 
-        // 셀 좌표 가져오기
-        function getCellCoords(cellIndex) {
-            const col = cellIndex % COLS;
-            const row = Math.floor(cellIndex / COLS);
-            return {
-                x: GRID_START_X + col * CELL_SIZE,
-                y: GRID_START_Y + row * CELL_SIZE,
-                width: CELL_SIZE,
-                height: CELL_SIZE
-            };
-        }
+function setActiveCell(idx) {
+  cells.forEach((c, i) => {
+    c.el.classList.remove('active-cell');
+  });
+  if (idx < TOTAL_CELLS) {
+    activeCellIdx = idx;
+    if (!cells[idx].done) {
+      cells[idx].el.classList.add('active-cell');
+    }
+  }
+}
 
-        // 좌표에서 셀 인덱스 가져오기
-        function getCellFromCoords(x, y) {
-            if (x < GRID_START_X || y < GRID_START_Y) return null;
+// ===== 획순 인디케이터 업데이트 =====
+function updateStrokeIndicator(strokeCount) {
+  for (let i = 1; i <= TOTAL_STROKES; i++) {
+    const dot = document.getElementById(`dot${i}`);
+    dot.classList.remove('active', 'done');
+    if (i < strokeCount + 1) dot.classList.add('done');
+    else if (i === strokeCount + 1) dot.classList.add('active');
+  }
+}
 
-            const col = Math.floor((x - GRID_START_X) / CELL_SIZE);
-            const row = Math.floor((y - GRID_START_Y) / CELL_SIZE);
+// ===== 포인트 → 캔버스 좌표 =====
+function getPos(canvas, e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  if (e.touches) {
+    return {
+      x: (e.touches[0].clientX - rect.left) * scaleX,
+      y: (e.touches[0].clientY - rect.top) * scaleY,
+    };
+  }
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top) * scaleY,
+  };
+}
 
-            if (col >= 0 && col < COLS && row >= 0 && row < ROWS) {
-                return row * COLS + col;
+// ===== 스무딩 그리기 =====
+function drawSmooth(ctx, points, color, width) {
+  if (points.length < 2) return;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length - 1; i++) {
+    const mx = (points[i].x + points[i+1].x) / 2;
+    const my = (points[i].y + points[i+1].y) / 2;
+    ctx.quadraticCurveTo(points[i].x, points[i].y, mx, my);
+  }
+  ctx.lineTo(points[points.length-1].x, points[points.length-1].y);
+  ctx.stroke();
+}
+
+// ===== 캔버스 전체 다시 그리기 =====
+function redrawCell(cellData) {
+  const { ctx, strokes, canvas } = cellData;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  strokes.forEach((s, i) => {
+    drawSmooth(ctx, s.points, STROKE_COLORS[i] || '#999', STROKE_WIDTHS[i] || 3);
+    // 획 시작점 표시
+    if (s.points.length > 0) {
+      ctx.beginPath();
+      ctx.arc(s.points[0].x, s.points[0].y, 4, 0, Math.PI * 2);
+      ctx.fillStyle = STROKE_COLORS[i] || '#999';
+      ctx.fill();
+    }
+  });
+}
+
+// ===== 획순 분석 =====
+function analyzeStrokes(strokes) {
+  if (strokes.length !== TOTAL_STROKES) return null;
+
+  const cw = CELL_W, ch = CELL_H;
+
+  // 각 획의 특성 계산
+  const features = strokes.map(s => {
+    const pts = s.points;
+    if (pts.length < 2) return null;
+    const xs = pts.map(p => p.x);
+    const ys = pts.map(p => p.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const dx = pts[pts.length-1].x - pts[0].x;
+    const dy = pts[pts.length-1].y - pts[0].y;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    const spanX = maxX - minX;
+    const spanY = maxY - minY;
+    return {
+      startX: pts[0].x / cw,
+      startY: pts[0].y / ch,
+      endX: pts[pts.length-1].x / cw,
+      endY: pts[pts.length-1].y / ch,
+      spanX: spanX / cw,
+      spanY: spanY / ch,
+      centerY: ((minY + maxY) / 2) / ch,
+      totalLen: len / Math.max(cw, ch),
+      isHorizontal: spanX > spanY,
+      isVertical: spanY > spanX,
+    };
+  });
+
+  // あ 획순 검사
+  // 1획: 상단 가로획 (startY < 0.5, spanX > spanY, 오른쪽 방향)
+  // 2획: 중간 세로/사선획 (startY < 0.6, 수직 혹은 왼쪽 커브)
+  // 3획: 하단 큰 커브 (가장 길거나 넓은 획)
+
+  const f0 = features[0], f1 = features[1], f2 = features[2];
+
+  const errors = [];
+
+  // 1획 검사: 상단 가로획
+  if (f0 && f0.startY > 0.55) {
+    errors.push('1획은 위쪽에서 시작해야 해요 (가로 획)');
+  }
+  if (f0 && !f0.isHorizontal && f0.spanX < 0.2) {
+    errors.push('1획은 가로 방향으로 그어야 해요');
+  }
+
+  // 2획 검사: 왼쪽 세로획
+  if (f1 && f1.startY > 0.6) {
+    errors.push('2획은 중간 위에서 시작해야 해요');
+  }
+  if (f1 && f1.startX > 0.7) {
+    errors.push('2획은 왼쪽에서 시작해야 해요');
+  }
+
+  // 3획 검사: 큰 원 획 (가장 복잡한 획)
+  if (f2 && f2.startY > 0.75) {
+    errors.push('3획은 너무 아래에서 시작했어요');
+  }
+
+  const correct = errors.length === 0;
+  return { correct, errors };
+}
+
+// ===== 피드백 표시 =====
+function showFeedback(msg, color, duration = 2000) {
+  const fb = document.getElementById('feedback');
+  fb.textContent = msg;
+  fb.style.background = color === 'green'
+    ? 'rgba(39, 174, 96, 0.95)'
+    : color === 'red'
+    ? 'rgba(231, 76, 60, 0.95)'
+    : 'rgba(255,255,255,0.95)';
+  fb.style.color = (color === 'green' || color === 'red') ? 'white' : '#333';
+  fb.style.display = 'block';
+  setTimeout(() => { fb.style.display = 'none'; }, duration);
+}
+
+// ===== 이벤트 바인딩 =====
+cells.forEach((cellData, idx) => {
+  const { canvas } = cellData;
+
+  function startDraw(e) {
+    e.preventDefault();
+    if (cellData.done) return;
+
+    // 이 셀 활성화
+    setActiveCell(idx);
+
+    if (cellData.strokeCount >= TOTAL_STROKES) {
+      showFeedback('🔄 이미 3획 모두 완성! 지우고 다시 시도하세요', 'white');
+      return;
+    }
+
+    cellData.isDrawing = true;
+    cellData.currentPoints = [getPos(canvas, e)];
+  }
+
+  function moveDraw(e) {
+    e.preventDefault();
+    if (!cellData.isDrawing) return;
+
+    const pt = getPos(canvas, e);
+    cellData.currentPoints.push(pt);
+
+    // 실시간 그리기
+    const ctx = cellData.ctx;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    redrawCell(cellData); // 기존 획 다시 그리기
+    drawSmooth(ctx, cellData.currentPoints,
+      STROKE_COLORS[cellData.strokeCount], STROKE_WIDTHS[cellData.strokeCount]);
+  }
+
+  function endDraw(e) {
+    e.preventDefault();
+    if (!cellData.isDrawing) return;
+    cellData.isDrawing = false;
+
+    const pts = cellData.currentPoints;
+    if (pts.length < 3) return; // 너무 짧은 획 무시
+
+    // 획 저장
+    cellData.strokes.push({ points: pts });
+    cellData.strokeCount++;
+    cellData.currentPoints = [];
+
+    redrawCell(cellData);
+    updateStrokeIndicator(cellData.strokeCount);
+
+    if (cellData.strokeCount === TOTAL_STROKES) {
+      // 획순 분석
+      setTimeout(() => {
+        const result = analyzeStrokes(cellData.strokes);
+        if (result) {
+          if (result.correct) {
+            cellData.el.classList.remove('active-cell');
+            cellData.el.classList.add('complete-correct');
+            cellData.done = true;
+            showFeedback('🎉 획순 정확! 잘 썼어요!', 'green');
+
+            // 다음 셀로 자동 이동
+            const nextIdx = idx + 1;
+            if (nextIdx < TOTAL_CELLS) {
+              setTimeout(() => setActiveCell(nextIdx), 800);
             }
-            return null;
+          } else {
+            cellData.el.classList.add('complete-wrong');
+            showFeedback('⚠️ ' + result.errors[0] + ' 다시 도전해봐요!', 'red', 3000);
+          }
         }
+      }, 200);
+    } else {
+      const remaining = TOTAL_STROKES - cellData.strokeCount;
+      showFeedback(`${cellData.strokeCount}획 완료 ✓ — 남은 획: ${remaining}개`, 'white', 1200);
+    }
+  }
 
-        // 그리기 시작
-        function startDrawing(e) {
-            e.preventDefault();
-            const coords = getCanvasCoords(e);
-            const cellIndex = getCellFromCoords(coords.x, coords.y);
+  // 마우스 이벤트
+  canvas.addEventListener('mousedown', startDraw);
+  canvas.addEventListener('mousemove', moveDraw);
+  canvas.addEventListener('mouseup', endDraw);
+  canvas.addEventListener('mouseleave', endDraw);
 
-            if (cellIndex !== null) {
-                selectedCell = cellIndex;
-                isDrawing = true;
-                currentStroke = [coords];
-                btnClearCell.disabled = false;
-                redrawCanvas();
-            }
-        }
+  // 터치 이벤트
+  canvas.addEventListener('touchstart', startDraw, { passive: false });
+  canvas.addEventListener('touchmove', moveDraw, { passive: false });
+  canvas.addEventListener('touchend', endDraw, { passive: false });
+});
 
-        // 그리기
-        function draw(e) {
-            if (!isDrawing || selectedCell === null) return;
-            e.preventDefault();
+// ===== 전체 지우기 =====
+document.getElementById('btn-clear').addEventListener('click', () => {
+  cells.forEach(c => {
+    c.strokes = [];
+    c.currentPoints = [];
+    c.strokeCount = 0;
+    c.isDrawing = false;
+    c.done = false;
+    c.el.classList.remove('complete-correct', 'complete-wrong', 'active-cell');
+    c.ctx.clearRect(0, 0, c.canvas.width, c.canvas.height);
+  });
+  setActiveCell(0);
+  updateStrokeIndicator(0);
+  showFeedback('🗑 전체 지웠어요! 처음부터 시작하세요', 'white', 1500);
+});
 
-            const coords = getCanvasCoords(e);
-            const cellIndex = getCellFromCoords(coords.x, coords.y);
+// ===== 현재 셀 획순 확인 =====
+document.getElementById('btn-check').addEventListener('click', () => {
+  const cellData = cells[activeCellIdx];
+  if (cellData.strokeCount < TOTAL_STROKES) {
+    showFeedback(`⏳ 아직 ${cellData.strokeCount}/${TOTAL_STROKES}획만 완성됐어요`, 'white', 1500);
+    return;
+  }
+  const result = analyzeStrokes(cellData.strokes);
+  if (result) {
+    if (result.correct) {
+      showFeedback('✅ 획순이 정확해요!', 'green');
+    } else {
+      showFeedback('❌ ' + result.errors.join(' / '), 'red', 3000);
+    }
+  }
+});
 
-            if (cellIndex === selectedCell) {
-                currentStroke.push(coords);
-                redrawCanvas();
-            }
-        }
-
-        // 그리기 종료
-        function endDrawing() {
-            if (isDrawing && currentStroke.length > 1) {
-                saveToHistory();
-                
-                if (!strokes[selectedCell]) {
-                    strokes[selectedCell] = [];
-                }
-                strokes[selectedCell].push(currentStroke);
-                currentStroke = [];
-                
-                btnUndo.disabled = false;
-                updateStats();
-                redrawCanvas();
-            }
-            isDrawing = false;
-        }
-
-        // 히스토리 저장
-        function saveToHistory() {
-            history.push(JSON.parse(JSON.stringify(strokes)));
-            if (history.length > 20) {
-                history.shift();
-            }
-        }
-
-        // 실행 취소
-        function undo() {
-            if (history.length > 0) {
-                strokes = history.pop();
-                if (history.length === 0) {
-                    btnUndo.disabled = true;
-                }
-                updateStats();
-                redrawCanvas();
-            }
-        }
-
-        // 캔버스 다시 그리기
-        function redrawCanvas() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // 선택된 셀 하이라이트
-            if (selectedCell !== null) {
-                const cell = getCellCoords(selectedCell);
-                ctx.fillStyle = 'rgba(255, 200, 0, 0.1)';
-                ctx.fillRect(cell.x, cell.y, cell.width, cell.height);
-            }
-
-            // 저장된 획들 그리기
-            for (const [cellIndex, cellStrokes] of Object.entries(strokes)) {
-                cellStrokes.forEach((stroke, strokeIndex) => {
-                    ctx.strokeStyle = STROKE_COLORS[strokeIndex % STROKE_COLORS.length];
-                    ctx.lineWidth = 4;
-                    ctx.lineCap = 'round';
-                    ctx.lineJoin = 'round';
-
-                    ctx.beginPath();
-                    stroke.forEach((point, i) => {
-                        if (i === 0) {
-                            ctx.moveTo(point.x, point.y);
-                        } else {
-                            ctx.lineTo(point.x, point.y);
-                        }
-                    });
-                    ctx.stroke();
-                });
-            }
-
-            // 현재 그리는 획
-            if (currentStroke.length > 0) {
-                const strokeIndex = (strokes[selectedCell] || []).length;
-                ctx.strokeStyle = STROKE_COLORS[strokeIndex % STROKE_COLORS.length];
-                ctx.lineWidth = 4;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-
-                ctx.beginPath();
-                currentStroke.forEach((point, i) => {
-                    if (i === 0) {
-                        ctx.moveTo(point.x, point.y);
-                    } else {
-                        ctx.lineTo(point.x, point.y);
-                    }
-                });
-                ctx.stroke();
-            }
-
-            // 피드백 표시
-            if (showFeedback) {
-                for (const [cellIndex, cellStrokes] of Object.entries(strokes)) {
-                    const cell = getCellCoords(parseInt(cellIndex));
-                    const feedback = calculateDetailedFeedback(cellStrokes, cell);
-
-                    // 정확도 표시
-                    const accuracyColor = feedback.accuracy > 80 ? '#22c55e' : 
-                                        feedback.accuracy > 60 ? '#3b82f6' :
-                                        feedback.accuracy > 40 ? '#f59e0b' : '#ef4444';
-                    
-                    ctx.fillStyle = accuracyColor;
-                    ctx.font = 'bold 28px Arial';
-                    ctx.fillText(`${feedback.accuracy}%`, cell.x + 10, cell.y + 35);
-
-                    // 획순 표시
-                    ctx.fillStyle = '#1f2937';
-                    ctx.font = 'bold 20px Arial';
-                    const strokeText = cellStrokes.length === 3 ? '✓ 3획' : `${cellStrokes.length}획`;
-                    ctx.fillText(strokeText, cell.x + 10, cell.y + 65);
-
-                    // 간단한 피드백 메시지
-                    if (feedback.message) {
-                        ctx.fillStyle = '#6b7280';
-                        ctx.font = '14px Arial';
-                        ctx.fillText(feedback.message, cell.x + 10, cell.y + 85);
-                    }
-                }
-            }
-        }
-
-        // 정규화된 좌표로 변환 (셀 내 0~1 범위)
-        function normalizeStroke(stroke, cell) {
-            return stroke.map(point => ({
-                x: (point.x - cell.x) / cell.width,
-                y: (point.y - cell.y) / cell.height
-            }));
-        }
-
-        // 획의 방향 계산 (위→아래, 왼→오 등)
-        function getStrokeDirection(stroke) {
-            if (stroke.length < 2) return null;
-            
-            const start = stroke[0];
-            const end = stroke[stroke.length - 1];
-            const dx = end.x - start.x;
-            const dy = end.y - start.y;
-            
-            if (Math.abs(dy) > Math.abs(dx) * 1.5) {
-                return dy > 0 ? 'down' : 'up';
-            } else if (Math.abs(dx) > Math.abs(dy) * 1.5) {
-                return dx > 0 ? 'right' : 'left';
-            } else {
-                return 'diagonal';
-            }
-        }
-
-        // 두 획 간의 유사도 계산
-        function calculateStrokeSimilarity(userStroke, idealStroke) {
-            const userNorm = userStroke;
-            const idealNorm = idealStroke;
-            
-            // 시작점과 끝점 비교
-            const startDist = Math.sqrt(
-                Math.pow(userNorm[0].x - idealNorm[0].x, 2) + 
-                Math.pow(userNorm[0].y - idealNorm[0].y, 2)
-            );
-            const endDist = Math.sqrt(
-                Math.pow(userNorm[userNorm.length-1].x - idealNorm[idealNorm.length-1].x, 2) + 
-                Math.pow(userNorm[userNorm.length-1].y - idealNorm[idealNorm.length-1].y, 2)
-            );
-            
-            // 거리 기반 점수 (0~100)
-            const startScore = Math.max(0, 100 - startDist * 200);
-            const endScore = Math.max(0, 100 - endDist * 200);
-            
-            return (startScore + endScore) / 2;
-        }
-
-        // 상세 피드백 계산
-        function calculateDetailedFeedback(cellStrokes, cell) {
-            if (!cellStrokes || cellStrokes.length === 0) {
-                return { accuracy: 0, message: '글자를 써보세요' };
-            }
-
-            const strokeCount = cellStrokes.length;
-            let totalScore = 0;
-            let message = '';
-
-            // 획수 점수
-            if (strokeCount === 3) {
-                totalScore += 40;
-                message = '완벽!';
-            } else if (strokeCount < 3) {
-                totalScore += 20;
-                message = `획이 부족합니다`;
-            } else {
-                totalScore += 20;
-                message = `획이 많습니다`;
-            }
-
-            // 각 획의 정확도 계산
-            let strokeScores = [];
-            for (let i = 0; i < Math.min(strokeCount, 3); i++) {
-                const normalized = normalizeStroke(cellStrokes[i], cell);
-                const idealStroke = IDEAL_STROKES[i];
-                const similarity = calculateStrokeSimilarity(normalized, idealStroke);
-                strokeScores.push(similarity);
-            }
-
-            // 획 정확도 평균
-            if (strokeScores.length > 0) {
-                const avgStrokeScore = strokeScores.reduce((a, b) => a + b, 0) / strokeScores.length;
-                totalScore += avgStrokeScore * 0.6;
-            }
-
-            const accuracy = Math.round(Math.min(100, totalScore));
-
-            return { accuracy, message };
-        }
-
-        // 통계 업데이트
-        function updateStats() {
-            if (!showFeedback) return;
-
-            const totalCells = Object.keys(strokes).length;
-            let totalStrokes = 0;
-            let totalAccuracy = 0;
-            let perfectCells = 0;
-
-            for (const cellStrokes of Object.values(strokes)) {
-                totalStrokes += cellStrokes.length;
-                if (cellStrokes.length === 3) perfectCells++;
-                
-                const cell = getCellCoords(0); // 임시
-                const feedback = calculateDetailedFeedback(cellStrokes, cell);
-                totalAccuracy += feedback.accuracy;
-            }
-
-            document.getElementById('statTotalStrokes').textContent = totalStrokes;
-            document.getElementById('statAvgAccuracy').textContent = 
-                totalCells > 0 ? Math.round(totalAccuracy / totalCells) + '%' : '0%';
-            document.getElementById('statCompleted').textContent = `${totalCells}/20`;
-            document.getElementById('statPerfect').textContent = perfectCells;
-        }
-
-        // 피드백 토글
-        function toggleFeedback() {
-            showFeedback = !showFeedback;
-            btnFeedback.classList.toggle('active');
-            btnFeedback.textContent = showFeedback ? '피드백 숨기기' : '피드백 보기';
-            statsPanel.style.display = showFeedback ? 'grid' : 'none';
-            updateStats();
-            redrawCanvas();
-        }
-
-        // 선택된 셀 지우기
-        function clearSelectedCell() {
-            if (selectedCell !== null) {
-                saveToHistory();
-                delete strokes[selectedCell];
-                btnUndo.disabled = false;
-                updateStats();
-                redrawCanvas();
-            }
-        }
-
-        // 전체 지우기
-        function clearAll() {
-            if (Object.keys(strokes).length > 0) {
-                saveToHistory();
-                btnUndo.disabled = false;
-            }
-            strokes = {};
-            selectedCell = null;
-            showFeedback = false;
-            btnFeedback.classList.remove('active');
-            btnFeedback.textContent = '피드백 보기';
-            btnClearCell.disabled = true;
-            statsPanel.style.display = 'none';
-            redrawCanvas();
-        }
-
-        // 페이지 로드 시 초기화
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', init);
-        } else {
-            init();
-        }
-    </script>
+// 초기 인디케이터
+updateStrokeIndicator(0);
+</script>
 </body>
 </html>
