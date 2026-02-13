@@ -2,258 +2,206 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>히라가나 20칸 연습 도구 - 로직 수정 완료</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hiragana Pro - Interactive Workbook</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Inter:wght@400;600;800&display=swap');
+        
         body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
             margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background-color: transparent; 
-            font-family: 'Noto Sans KR', sans-serif;
-            user-select: none;
-            -webkit-user-select: none;
-        }
-        .canvas-container {
-            position: relative;
-            width: 100vw;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            overflow: hidden;
         }
-        .ui-overlay {
+
+        /* 워크북 컨테이너 */
+        .workbook-frame {
+            position: relative;
+            width: 95vw;
+            max-width: 1200px;
+            aspect-ratio: 16 / 9;
+            background-image: url('001_00.jpg');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            border: 4px solid #1e293b;
+        }
+
+        /* 투명 캔버스 레이어: 이상한 커서 아이콘 제거 및 기본 크로스헤어 적용 */
+        #drawingCanvas {
             position: absolute;
-            top: 10px;
-            width: 90%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            pointer-events: none;
-            z-index: 100;
-        }
-        .status-badge {
-            background: rgba(46, 134, 222, 0.95);
-            color: white;
-            padding: 8px 18px;
-            border-radius: 25px;
-            font-size: 14px;
-            font-weight: bold;
-            pointer-events: auto;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            min-width: 180px;
-            text-align: center;
-        }
-        .reset-btn {
-            background: rgba(255, 107, 107, 0.95);
-            color: white;
-            border: none;
-            padding: 8px 18px;
-            border-radius: 10px;
-            cursor: pointer;
-            pointer-events: auto;
-            font-weight: bold;
-            font-size: 14px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        }
-        canvas {
-            background-color: transparent; 
-            cursor: crosshair;
-            touch-action: none;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
-            display: block;
+            z-index: 20;
+            cursor: crosshair; /* 깔끔한 십자선 커서로 변경 */
+            touch-action: none;
+        }
+
+        /* 하단 플로팅 피드백 바 */
+        .feedback-bar {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 15px 25px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 30;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .accent-neon {
+            color: #4ade80;
+            text-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
+        }
+
+        .btn-action {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .btn-action:active {
+            transform: scale(0.95);
         }
     </style>
 </head>
 <body>
 
-<div class="canvas-container">
-    <div class="ui-overlay">
-        <div class="status-badge" id="info">연습할 칸에 'あ'를 써보세요</div>
-        <button class="reset-btn" onclick="resetAll()">전체 지우기</button>
+    <div class="workbook-frame" id="workbookFrame">
+        <canvas id="drawingCanvas"></canvas>
+
+        <div class="feedback-bar">
+            <div class="flex items-center gap-6">
+                <div>
+                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Target</p>
+                    <p class="text-xl font-black accent-neon">あ <span class="text-xs font-normal text-white/50 ml-1">[a]</span></p>
+                </div>
+                <div class="h-8 w-[1px] bg-slate-700"></div>
+                <div>
+                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Strokes</p>
+                    <p id="strokeCount" class="text-xl font-black italic">0 / 3</p>
+                </div>
+                <div class="hidden md:block ml-4">
+                    <p id="aiFeedback" class="text-sm font-medium text-slate-300">오른쪽 연습 칸에 직접 써보세요.</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <button onclick="clearCanvas()" class="btn-action px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold border border-slate-600">CLEAR</button>
+                <button onclick="analyzeWriting()" class="btn-action px-5 py-2 rounded-xl bg-green-500 hover:bg-green-400 text-slate-900 text-xs font-black shadow-lg shadow-green-500/20">ANALYZE</button>
+            </div>
+        </div>
     </div>
-    <canvas id="paintCanvas"></canvas>
-</div>
 
-<script>
-    const canvas = document.getElementById('paintCanvas');
-    const ctx = canvas.getContext('2d');
-    const info = document.getElementById('info');
-    
-    let isDrawing = false;
-    let lastPos = { x: 0, y: 0 };
-    
-    const gridCols = 5;
-    const gridRows = 4;
+    <div id="successOverlay" class="fixed inset-0 bg-green-500/10 backdrop-blur-sm hidden z-50 flex items-center justify-center pointer-events-none">
+        <div class="text-center animate-bounce">
+            <span class="text-8xl">✨</span>
+            <h2 class="text-4xl font-black text-white mt-4 italic">PERFECT!</h2>
+        </div>
+    </div>
 
-    // 히라가나 'あ' 가이드 좌표 (판정 지점을 획순별로 분리하여 정확도 계산 방식 개선)
-    const charTemplate = {
-        strokes: [
-            // 1획 (가로) - 5개 포인트
-            { id: 0, points: [{x:0.25, y:0.38}, {x:0.37, y:0.38}, {x:0.5, y:0.38}, {x:0.62, y:0.38}, {x:0.75, y:0.38}] },
-            // 2획 (세로) - 6개 포인트
-            { id: 1, points: [{x:0.5, y:0.18}, {x:0.5, y:0.3}, {x:0.5, y:0.45}, {x:0.5, y:0.6}, {x:0.5, y:0.75}, {x:0.5, y:0.85}] },
-            // 3획 (곡선) - 10개 포인트
-            { id: 2, points: [
-                {x:0.65, y:0.25}, {x:0.55, y:0.35}, {x:0.45, y:0.45}, {x:0.35, y:0.55}, 
-                {x:0.32, y:0.7}, {x:0.45, y:0.85}, {x:0.65, y:0.85}, {x:0.8, y:0.7}, 
-                {x:0.78, y:0.5}, {x:0.6, y:0.45}
-            ]}
-        ]
-    };
+    <script>
+        const canvas = document.getElementById('drawingCanvas');
+        const ctx = canvas.getContext('2d');
+        const frame = document.getElementById('workbookFrame');
+        let isDrawing = false;
+        let strokeCount = 0;
 
-    const totalPointsCount = charTemplate.strokes.reduce((acc, s) => acc + s.points.length, 0);
-
-    let gridStates = Array.from({ length: 20 }, () => ({
-        checkpointStatus: charTemplate.strokes.map(s => s.points.map(() => false)),
-        pointsReached: 0,
-        complete: false
-    }));
-
-    function resize() {
-        const dpr = window.devicePixelRatio || 1;
-        const rect = canvas.getBoundingClientRect();
-        canvas.width = rect.width * dpr;
-        canvas.height = rect.height * dpr;
-        ctx.scale(dpr, dpr);
-        
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.lineWidth = 5;
-        ctx.strokeStyle = '#1e1e1e';
-    }
-
-    window.addEventListener('resize', resize);
-    window.addEventListener('load', resize);
-    resize();
-
-    function getPos(e) {
-        const rect = canvas.getBoundingClientRect();
-        let clientX, clientY;
-        if (e.touches && e.touches.length > 0) {
-            clientX = e.touches[0].clientX;
-            clientY = e.touches[0].clientY;
-        } else {
-            clientX = e.clientX;
-            clientY = e.clientY;
+        function resizeCanvas() {
+            canvas.width = frame.clientWidth;
+            canvas.height = frame.clientHeight;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#2563eb';
         }
-        return { x: clientX - rect.left, y: clientY - rect.top };
-    }
 
-    function getGridIndex(x, y) {
-        const w = canvas.offsetWidth;
-        const h = canvas.offsetHeight;
-        
-        // 정밀한 칸 인덱스 계산을 위해 부동 소수점 오차 방지
-        const col = Math.floor(x / (w / gridCols));
-        const row = Math.floor(y / (h / gridRows));
-        
-        if (col < 0 || col >= gridCols || row < 0 || row >= gridRows) return -1;
-        return row * gridCols + col;
-    }
+        window.addEventListener('load', resizeCanvas);
+        window.addEventListener('resize', resizeCanvas);
 
-    function startDrawing(e) {
-        if (e.button !== undefined && e.button !== 0) return;
-        const pos = getPos(e);
-        const idx = getGridIndex(pos.x, pos.y);
-        if (idx === -1) return;
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+                x: (clientX - rect.left) * (canvas.width / rect.width),
+                y: (clientY - rect.top) * (canvas.height / rect.height)
+            };
+        }
 
-        isDrawing = true;
-        lastPos = pos;
-        ctx.beginPath();
-        ctx.moveTo(pos.x, pos.y);
-    }
+        function startDrawing(e) {
+            isDrawing = true;
+            const pos = getMousePos(e);
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+        }
 
-    function draw(e) {
-        if (!isDrawing) return;
-        if (e.cancelable) e.preventDefault();
-
-        const pos = getPos(e);
-        const idx = getGridIndex(pos.x, pos.y);
-        
-        if (idx !== -1) {
+        function draw(e) {
+            if (!isDrawing) return;
+            const pos = getMousePos(e);
             ctx.lineTo(pos.x, pos.y);
             ctx.stroke();
-            checkAccuracy(idx, pos.x, pos.y);
-            lastPos = pos;
         }
-    }
 
-    function stopDrawing() {
-        if (isDrawing) {
-            ctx.closePath();
+        function stopDrawing() {
+            if (!isDrawing) return;
             isDrawing = false;
+            strokeCount++;
+            document.getElementById('strokeCount').innerText = `${strokeCount} / 3`;
+            updateFeedback();
         }
-    }
 
-    function checkAccuracy(idx, x, y) {
-        const state = gridStates[idx];
-        if (!state || state.complete) return;
+        function updateFeedback() {
+            const fb = document.getElementById('aiFeedback');
+            if(strokeCount === 1) fb.innerText = "좋아요! 두 번째 획을 이어서 그려보세요.";
+            if(strokeCount === 2) fb.innerText = "마지막 곡선 획만 남았습니다. 균형에 주의하세요.";
+            if(strokeCount === 3) fb.innerText = "획순 완성! 'ANALYZE' 버튼을 눌러보세요.";
+        }
 
-        const colWidth = canvas.offsetWidth / gridCols;
-        const rowHeight = canvas.offsetHeight / gridRows;
-        
-        const relX = (x % colWidth) / colWidth;
-        const relY = (y % rowHeight) / rowHeight;
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            strokeCount = 0;
+            document.getElementById('strokeCount').innerText = `0 / 3`;
+            document.getElementById('aiFeedback').innerText = "오른쪽 연습 칸에 직접 써보세요.";
+            document.getElementById('aiFeedback').classList.remove('text-green-400');
+        }
 
-        let pointsJustAdded = 0;
-
-        charTemplate.strokes.forEach((stroke, sIdx) => {
-            stroke.points.forEach((pt, pIdx) => {
-                if (!state.checkpointStatus[sIdx][pIdx]) {
-                    const dist = Math.hypot(pt.x - relX, pt.y - relY);
-                    // 판정 반경 0.18로 최적화 (너무 넓으면 획 하나에 점수가 다 참)
-                    if (dist < 0.18) { 
-                        state.checkpointStatus[sIdx][pIdx] = true;
-                        state.pointsReached++;
-                        pointsJustAdded++;
-                    }
-                }
-            });
-        });
-
-        if (pointsJustAdded > 0) {
-            // 정확도 계산: 전체 포인트 중 획득한 포인트 비율
-            const acc = Math.round((state.pointsReached / totalPointsCount) * 100);
-            updateInfoUI(idx, acc);
-
-            if (acc >= 90) {
-                state.complete = true;
-                info.innerText = `${idx + 1}번 완성! ✨`;
-                info.style.background = '#27ae60';
+        function analyzeWriting() {
+            if (strokeCount === 0) return;
+            const fb = document.getElementById('aiFeedback');
+            if(strokeCount === 3) {
+                fb.innerText = "완벽한 획순입니다! 형태가 매우 수려하네요.";
+                fb.classList.add('text-green-400');
+                const overlay = document.getElementById('successOverlay');
+                overlay.classList.remove('hidden');
+                setTimeout(() => overlay.classList.add('hidden'), 2000);
+            } else {
+                fb.innerText = "획순이 맞지 않습니다. 'あ'는 총 3획입니다.";
+                fb.classList.add('text-red-400');
             }
         }
-    }
 
-    function updateInfoUI(idx, acc) {
-        info.style.background = `linear-gradient(90deg, #2e86de ${acc}%, rgba(46, 134, 222, 0.9) ${acc}%)`;
-        info.innerText = `${idx + 1}번 칸 연습 중 (${acc}%)`;
-    }
-
-    function resetAll() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        gridStates.forEach(s => {
-            s.pointsReached = 0;
-            s.complete = false;
-            s.checkpointStatus = charTemplate.strokes.map(str => str.points.map(() => false));
-        });
-        info.innerText = "연습장에 'あ'를 써보세요";
-        info.style.background = "rgba(46, 134, 222, 0.95)";
-    }
-
-    canvas.addEventListener('mousedown', startDrawing);
-    window.addEventListener('mousemove', draw);
-    window.addEventListener('mouseup', stopDrawing);
-
-    canvas.addEventListener('touchstart', (e) => {
-        startDrawing(e);
-    }, {passive: false});
-    canvas.addEventListener('touchmove', (e) => {
-        draw(e);
-    }, {passive: false});
-    canvas.addEventListener('touchend', stopDrawing);
-
-</script>
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        window.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDrawing(e); });
+        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e); });
+        canvas.addEventListener('touchend', stopDrawing);
+    </script>
 </body>
 </html>
