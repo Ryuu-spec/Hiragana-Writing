@@ -49,105 +49,23 @@ body {
 #bUndo  { background:#8B5CF6; color:#fff; }
 #bClear { background:#EF4444; color:#fff; }
 
-/* ══ 펜 플로팅 버튼 ══ */
-#pen-fab {
+/* ══ 펜 선택 바 ══ */
+#pen-bar {
   position:absolute;
-  right: 3.5vw; top: 5.5vh;
-  width: 3.2vw; height: 3.2vw;
-  border-radius: 50%;
-  background: #FF6B35;
-  border: none; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 3px 12px rgba(255,107,53,.45);
-  pointer-events: all;
-  transition: transform .2s, box-shadow .2s;
-  z-index: 600;
-  font-size: 1.4vw;
+  left:52.562vw; top:25.861vh;
+  display:flex; gap:0.35vw;
+  pointer-events:none; z-index:80;
 }
-#pen-fab:hover { transform: scale(1.08); box-shadow: 0 5px 18px rgba(255,107,53,.55); }
-#pen-fab.open  { transform: scale(1.08) rotate(15deg); }
-
-/* 펜 미리보기 (FAB 안) */
-#pen-preview-dot {
-  width: 1.1vw; height: 1.1vw;
-  border-radius: 50%;
-  background: #fff;
-  border: 2px solid rgba(255,255,255,.6);
-  transition: all .2s;
+.pen-btn {
+  pointer-events:all;
+  padding:0.22vh 0.6vw; border:2px solid transparent;
+  border-radius:0.8vw; font-size:0.72vw; font-weight:700;
+  cursor:pointer; background:rgba(255,255,255,.88);
+  color:#555; transition:all .15s;
+  box-shadow:0 1px 4px rgba(0,0,0,.1);
 }
-
-/* ══ 펜 툴바 패널 ══ */
-#pen-panel {
-  position: absolute;
-  right: 3.5vw; top: 9.5vh;
-  background: rgba(30,30,35,.92);
-  backdrop-filter: blur(12px);
-  border-radius: 1.4vw;
-  padding: 1.0vh 1.0vw;
-  display: none;
-  flex-direction: column;
-  gap: 0.9vh;
-  pointer-events: all;
-  z-index: 595;
-  box-shadow: 0 8px 32px rgba(0,0,0,.4);
-  min-width: 14vw;
-}
-#pen-panel.open { display: flex; }
-
-/* 색상 팔레트 */
-#color-row {
-  display: flex; gap: 0.45vw; align-items: center;
-  flex-wrap: wrap;
-}
-.color-swatch {
-  width: 1.7vw; height: 1.7vw;
-  border-radius: 50%; border: 2.5px solid transparent;
-  cursor: pointer; transition: transform .15s, border-color .15s;
-  flex-shrink: 0;
-}
-.color-swatch:hover   { transform: scale(1.18); }
-.color-swatch.active  { border-color: #fff; transform: scale(1.22); box-shadow: 0 0 0 1.5px rgba(255,255,255,.4); }
-
-/* 굵기 슬라이더 */
-#thickness-row {
-  display: flex; align-items: center; gap: 0.6vw;
-}
-#thickness-label {
-  color: rgba(255,255,255,.55); font-size: 0.65vw; min-width: 1.5vw; text-align: center;
-}
-#thickness-slider {
-  -webkit-appearance: none; appearance: none;
-  flex: 1; height: 4px; background: rgba(255,255,255,.2);
-  border-radius: 2px; outline: none; cursor: pointer;
-}
-#thickness-slider::-webkit-slider-thumb {
-  -webkit-appearance: none; appearance: none;
-  width: 1.1vw; height: 1.1vw;
-  border-radius: 50%; background: #fff;
-  cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.3);
-}
-#thickness-val {
-  color: rgba(255,255,255,.8); font-size: 0.65vw;
-  min-width: 1.2vw; text-align: center; font-weight: 700;
-}
-
-/* 펜 종류 */
-#pen-type-row {
-  display: flex; gap: 0.4vw;
-}
-.ptype-btn {
-  flex: 1; padding: 0.35vh 0;
-  background: rgba(255,255,255,.1);
-  border: 1.5px solid transparent; border-radius: 0.7vw;
-  color: rgba(255,255,255,.7); font-size: 0.65vw; font-weight: 700;
-  cursor: pointer; text-align: center;
-  transition: all .15s;
-}
-.ptype-btn:hover  { background: rgba(255,255,255,.18); }
-.ptype-btn.active { background: rgba(255,255,255,.22); border-color: rgba(255,255,255,.6); color: #fff; }
-
-/* 구분선 */
-.panel-divider { height: 1px; background: rgba(255,255,255,.12); margin: 0 -0.2vw; }
+.pen-btn:hover  { background:#fff; }
+.pen-btn.active { border-color:#6366F1; color:#6366F1; background:#fff; }
 
 /* ══ 격자 ══ */
 #grid {
@@ -295,40 +213,6 @@ body {
     <button class="pen-btn"        data-pen="brush">🖌️ 붓</button>
   </div>
 
-  <!-- 펜 FAB 버튼 -->
-  <button id="pen-fab" title="펜 설정">
-    <div id="pen-preview-dot"></div>
-  </button>
-
-  <!-- 펜 설정 패널 -->
-  <div id="pen-panel">
-    <!-- 색상 팔레트 (Genially 동일 색상) -->
-    <div id="color-row">
-      <div class="color-swatch active" data-color="#3B82F6" style="background:#3B82F6"></div>
-      <div class="color-swatch" data-color="#EF4444"  style="background:#EF4444"></div>
-      <div class="color-swatch" data-color="#F59E0B"  style="background:#F59E0B"></div>
-      <div class="color-swatch" data-color="#10B981"  style="background:#10B981"></div>
-      <div class="color-swatch" data-color="#22C7DA"  style="background:#22C7DA"></div>
-      <div class="color-swatch" data-color="#4FA4F1"  style="background:#4FA4F1"></div>
-      <div class="color-swatch" data-color="#AE45C3"  style="background:#AE45C3"></div>
-      <div class="color-swatch" data-color="#1a1a1a"  style="background:#1a1a1a"></div>
-    </div>
-    <div class="panel-divider"></div>
-    <!-- 굵기 슬라이더 -->
-    <div id="thickness-row">
-      <span id="thickness-label">굵기</span>
-      <input type="range" id="thickness-slider" min="1" max="5" step="0.5" value="2.5">
-      <span id="thickness-val">2.5</span>
-    </div>
-    <div class="panel-divider"></div>
-    <!-- 펜 종류 -->
-    <div id="pen-type-row">
-      <button class="ptype-btn active" data-pen="g">✒️ G펜</button>
-      <button class="ptype-btn"        data-pen="pencil">✏️ 연필</button>
-      <button class="ptype-btn"        data-pen="brush">🖌️ 붓</button>
-    </div>
-  </div>
-
   <div id="grid"></div>
   <div id="toast"></div>
 
@@ -356,67 +240,18 @@ body {
 </div>
 
 <script>
-/* ══ 펜 상태 ══ */
+/* ══ 펜 설정 ══ */
 const PENS={
-  g:      {lw:.028, opacity:1.0,  texture:false},
-  pencil: {lw:.020, opacity:.80,  texture:true },
-  brush:  {lw:.045, opacity:.88,  texture:false},
+  g:      {lw:.028,opacity:1.0,  texture:false},
+  pencil: {lw:.020,opacity:.80,  texture:true },
+  brush:  {lw:.045,opacity:.88,  texture:false},
 };
 let curPen='g';
-let curColor='#3B82F6';
-let curThickness=2.5; // 1~5 배율
-
-/* FAB 토글 */
-const fab   = document.getElementById('pen-fab');
-const panel = document.getElementById('pen-panel');
-const dot   = document.getElementById('pen-preview-dot');
-
-function updateFab(){
-  dot.style.background = curColor;
-  dot.style.width  = (0.5 + curThickness*0.18)+'vw';
-  dot.style.height = (0.5 + curThickness*0.18)+'vw';
-}
-updateFab();
-
-fab.addEventListener('click', e=>{
-  e.stopPropagation();
-  const open = panel.classList.toggle('open');
-  fab.classList.toggle('open', open);
-});
-document.addEventListener('pointerdown', e=>{
-  if(!panel.contains(e.target) && e.target!==fab){
-    panel.classList.remove('open');
-    fab.classList.remove('open');
-  }
-});
-
-/* 색상 선택 */
-document.querySelectorAll('.color-swatch').forEach(sw=>{
-  sw.addEventListener('click', e=>{
+document.querySelectorAll('.pen-btn').forEach(b=>{
+  b.addEventListener('click',e=>{
     e.stopPropagation();
-    curColor = sw.dataset.color;
-    document.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('active'));
-    sw.classList.add('active');
-    updateFab();
-  });
-});
-
-/* 굵기 슬라이더 */
-const slider = document.getElementById('thickness-slider');
-const valEl  = document.getElementById('thickness-val');
-slider.addEventListener('input', e=>{
-  e.stopPropagation();
-  curThickness = parseFloat(slider.value);
-  valEl.textContent = curThickness;
-  updateFab();
-});
-
-/* 펜 종류 */
-document.querySelectorAll('.ptype-btn').forEach(b=>{
-  b.addEventListener('click', e=>{
-    e.stopPropagation();
-    curPen = b.dataset.pen;
-    document.querySelectorAll('.ptype-btn').forEach(x=>x.classList.remove('active'));
+    curPen=b.dataset.pen;
+    document.querySelectorAll('.pen-btn').forEach(x=>x.classList.remove('active'));
     b.classList.add('active');
   });
 });
@@ -495,11 +330,10 @@ function evPt(e,c){
   const r=c.cvs.getBoundingClientRect(),src=e.touches?e.touches[0]:e;
   return{x:(src.clientX-r.left)*(c.W/r.width),y:(src.clientY-r.top)*(c.H/r.height)};
 }
-function drawCurve(ctx,pts,color,W,penKey,thickMul){
+function drawCurve(ctx,pts,color,W,penKey){
   if(pts.length<2)return;
   const p=PENS[penKey||curPen];
-  const mul = thickMul !== undefined ? thickMul : curThickness;
-  const lw=Math.max(1.5, W * p.lw * (mul/2.5));
+  const lw=Math.max(2.5,W*p.lw);
   const layers=p.texture?3:1;
   ctx.save();
   for(let l=0;l<layers;l++){
@@ -523,7 +357,7 @@ function drawCurve(ctx,pts,color,W,penKey,thickMul){
 function redraw(c){
   if(!c.W)return;
   c.ctx.clearRect(0,0,c.W,c.H);
-  c.strokes.forEach((s)=>drawCurve(c.ctx, s.pts, s.color, c.W, s.pen, s.thick));
+  c.strokes.forEach((s,i)=>drawCurve(c.ctx,s,SC[i],c.W,'g'));
 }
 
 /* ══ 획 분석 ══ */
@@ -694,7 +528,7 @@ cells.forEach((c,idx)=>{
     if(!c.drawing)return;
     c.pts.push(evPt(e,c));
     redraw(c);
-    drawCurve(c.ctx,c.pts,curColor,c.W,curPen,curThickness);
+    drawCurve(c.ctx,c.pts,SC[c.strokes.length],c.W,curPen);
   },{passive:false});
 
   function onEnd(e){
@@ -704,9 +538,7 @@ cells.forEach((c,idx)=>{
     if(c.pts.length<4){c.pts=[];return;}
     const si=c.strokes.length;
     const res=analyzeStroke(si,c.pts,c.W,c.H);
-    // 획 저장: 색상/펜/굵기 함께
-    c.strokes.push({pts:[...c.pts], color:curColor, pen:curPen, thick:curThickness});
-    c.pts=[];
+    c.strokes.push([...c.pts]);c.pts=[];
     redraw(c);syncDots(c.strokes.length);
 
     // 배지
@@ -720,7 +552,7 @@ cells.forEach((c,idx)=>{
       showStrokePop(c.el,'try');
       toast(res.msgs[0],'ng',2500);
     } else {
-      bdg.textContent=`${si+1}✓`;bdg.style.color=curColor;
+      bdg.textContent=`${si+1}✓`;bdg.style.color=SC[si];
       c.el.appendChild(bdg);
       showStrokePop(c.el,res.quality);
       if(res.msgs.length>0)toast('💡 '+res.msgs[0],'info',1800);
@@ -728,9 +560,8 @@ cells.forEach((c,idx)=>{
       if(c.strokes.length===MAX_S){
         c.done=true;c.el.classList.remove('active');
         setTimeout(()=>{
-          const rawPts=c.strokes.map(s=>s.pts);
-          const pct=calcAccuracy(rawPts,c.W,c.H)??0;
-          const allMsgs=rawPts.flatMap((pts,i)=>analyzeStroke(i,pts,c.W,c.H).msgs);
+          const pct=calcAccuracy(c.strokes,c.W,c.H)??0;
+          const allMsgs=c.strokes.flatMap((pts,i)=>analyzeStroke(i,pts,c.W,c.H).msgs);
           showResult(pct,allMsgs,c.el);
         },350);
         const nxt=cells.findIndex((cc,i)=>i>idx&&!cc.done);
