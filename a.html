@@ -21,8 +21,8 @@ body {
 /* ══ 상단바 ══ */
 #topbar {
   position:absolute;
-  left:52.562vw; top:23.342vh;
-  width:43.021vw; height:3.8vh;
+  left:52.5618vw; top:23.1938vh;
+  width:43.0212vw; height:3.8vh;
   display:flex; align-items:center; gap:0.5vw;
   pointer-events:none;
 }
@@ -49,34 +49,15 @@ body {
 #bUndo  { background:#8B5CF6; color:#fff; }
 #bClear { background:#EF4444; color:#fff; }
 
-/* ══ 펜 선택 바 ══ */
-#pen-bar {
-  position:absolute;
-  left:52.562vw; top:25.861vh;
-  display:flex; gap:0.35vw;
-  pointer-events:none; z-index:80;
-}
-.pen-btn {
-  pointer-events:all;
-  padding:0.22vh 0.6vw; border:2px solid transparent;
-  border-radius:0.8vw; font-size:0.72vw; font-weight:700;
-  cursor:pointer; background:rgba(255,255,255,.88);
-  color:#555; transition:all .15s;
-  box-shadow:0 1px 4px rgba(0,0,0,.1);
-}
-.pen-btn:hover  { background:#fff; }
-.pen-btn.active { border-color:#6366F1; color:#6366F1; background:#fff; }
-
 /* ══ 격자 ══ */
 #grid {
   position:absolute;
-  left:52.562vw; top:28.527vh;
-  width:43.021vw; height:59.690vh;
+  left:52.5618vw; top:28.5271vh;
+  width:43.0212vw; height:59.8450vh;
   pointer-events:none;
   display:grid;
-  /* 양 끝 셀이 중간보다 약간 좁음 */
-  grid-template-columns: 8.260vw 8.790vw 8.856vw 8.856vw 8.260vw;
-  grid-template-rows:    repeat(4, 14.922vh);
+  grid-template-columns: 8.2597vw 8.7898vw 8.8560vw 8.8560vw 8.2597vw;
+  grid-template-rows:    14.5736vh 15.3488vh 15.3488vh 14.5736vh;
 }
 .cell {
   position:relative;
@@ -207,12 +188,6 @@ body {
     <button class="tbtn" id="bClear">🗑 전체 지우기</button>
   </div>
 
-  <div id="pen-bar">
-    <button class="pen-btn active" data-pen="g">✒️ G펜</button>
-    <button class="pen-btn"        data-pen="pencil">✏️ 연필</button>
-    <button class="pen-btn"        data-pen="brush">🖌️ 붓</button>
-  </div>
-
   <div id="grid"></div>
   <div id="toast"></div>
 
@@ -240,21 +215,11 @@ body {
 </div>
 
 <script>
-/* ══ 펜 설정 ══ */
-const PENS={
-  g:      {lw:.028,opacity:1.0,  texture:false},
-  pencil: {lw:.020,opacity:.80,  texture:true },
-  brush:  {lw:.045,opacity:.88,  texture:false},
-};
+/* ══ 펜 상태 (고정) ══ */
+const PEN = {lw:.028, opacity:1.0, texture:false};
 let curPen='g';
-document.querySelectorAll('.pen-btn').forEach(b=>{
-  b.addEventListener('click',e=>{
-    e.stopPropagation();
-    curPen=b.dataset.pen;
-    document.querySelectorAll('.pen-btn').forEach(x=>x.classList.remove('active'));
-    b.classList.add('active');
-  });
-});
+const curColor='#3B82F6';
+const curThickness=2.5;
 
 /* ══ 등급 ══ */
 const GRADES=[
@@ -330,10 +295,11 @@ function evPt(e,c){
   const r=c.cvs.getBoundingClientRect(),src=e.touches?e.touches[0]:e;
   return{x:(src.clientX-r.left)*(c.W/r.width),y:(src.clientY-r.top)*(c.H/r.height)};
 }
-function drawCurve(ctx,pts,color,W,penKey){
+function drawCurve(ctx,pts,color,W,_penKey,thickMul){
   if(pts.length<2)return;
-  const p=PENS[penKey||curPen];
-  const lw=Math.max(2.5,W*p.lw);
+  const p=PEN;
+  const mul = thickMul !== undefined ? thickMul : curThickness;
+  const lw=Math.max(1.5, W * p.lw * (mul/2.5));
   const layers=p.texture?3:1;
   ctx.save();
   for(let l=0;l<layers;l++){
@@ -357,7 +323,7 @@ function drawCurve(ctx,pts,color,W,penKey){
 function redraw(c){
   if(!c.W)return;
   c.ctx.clearRect(0,0,c.W,c.H);
-  c.strokes.forEach((s,i)=>drawCurve(c.ctx,s,SC[i],c.W,'g'));
+  c.strokes.forEach((s)=>drawCurve(c.ctx, s.pts, s.color, c.W, s.pen, s.thick));
 }
 
 /* ══ 획 분석 ══ */
@@ -528,7 +494,7 @@ cells.forEach((c,idx)=>{
     if(!c.drawing)return;
     c.pts.push(evPt(e,c));
     redraw(c);
-    drawCurve(c.ctx,c.pts,SC[c.strokes.length],c.W,curPen);
+    drawCurve(c.ctx,c.pts,curColor,c.W,curPen,curThickness);
   },{passive:false});
 
   function onEnd(e){
@@ -538,7 +504,9 @@ cells.forEach((c,idx)=>{
     if(c.pts.length<4){c.pts=[];return;}
     const si=c.strokes.length;
     const res=analyzeStroke(si,c.pts,c.W,c.H);
-    c.strokes.push([...c.pts]);c.pts=[];
+    // 획 저장: 색상/펜/굵기 함께
+    c.strokes.push({pts:[...c.pts], color:curColor, pen:curPen, thick:curThickness});
+    c.pts=[];
     redraw(c);syncDots(c.strokes.length);
 
     // 배지
@@ -552,7 +520,7 @@ cells.forEach((c,idx)=>{
       showStrokePop(c.el,'try');
       toast(res.msgs[0],'ng',2500);
     } else {
-      bdg.textContent=`${si+1}✓`;bdg.style.color=SC[si];
+      bdg.textContent=`${si+1}✓`;bdg.style.color=curColor;
       c.el.appendChild(bdg);
       showStrokePop(c.el,res.quality);
       if(res.msgs.length>0)toast('💡 '+res.msgs[0],'info',1800);
@@ -560,8 +528,9 @@ cells.forEach((c,idx)=>{
       if(c.strokes.length===MAX_S){
         c.done=true;c.el.classList.remove('active');
         setTimeout(()=>{
-          const pct=calcAccuracy(c.strokes,c.W,c.H)??0;
-          const allMsgs=c.strokes.flatMap((pts,i)=>analyzeStroke(i,pts,c.W,c.H).msgs);
+          const rawPts=c.strokes.map(s=>s.pts);
+          const pct=calcAccuracy(rawPts,c.W,c.H)??0;
+          const allMsgs=rawPts.flatMap((pts,i)=>analyzeStroke(i,pts,c.W,c.H).msgs);
           showResult(pct,allMsgs,c.el);
         },350);
         const nxt=cells.findIndex((cc,i)=>i>idx&&!cc.done);
