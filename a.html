@@ -21,8 +21,8 @@ body {
 /* ══ 상단바 ══ */
 #topbar {
   position:absolute;
-  left:53.0172vw; top:23.8784vh;
-  width:41.9828vw; height:3.8vh;
+  left:53.01724vw; top:24.06471vh;
+  width:41.98276vw; height:3.8vh;
   display:flex; align-items:center; gap:0.5vw;
   pointer-events:none;
 }
@@ -52,12 +52,12 @@ body {
 /* ══ 격자 ══ */
 #grid {
   position:absolute;
-  left:53.0172vw; top:29.2117vh;
-  width:41.9828vw; height:59.5054vh;
+  left:53.01724vw; top:29.21175vh;
+  width:41.98276vw; height:59.65997vh;
   pointer-events:none;
   display:grid;
-  grid-template-columns: 8.0603vw 8.5776vw 8.6422vw 8.6422vw 8.0603vw;
-  grid-template-rows:    14.4900vh 15.3400vh 15.3014vh 14.3740vh;
+  grid-template-columns: 8.53448vw 8.10345vw 8.64224vw 8.64224vw 8.06034vw;
+  grid-template-rows:    14.52859vh 15.30139vh 15.30139vh 14.52859vh;
 }
 .cell {
   position:relative;
@@ -212,7 +212,7 @@ const REF=[
 
 /* ══ 셀 생성 ══ */
 const COLS=5,ROWS=4,TOTAL=20,MAX_S=3;
-const SC=['#3B82F6','#10B981','#F59E0B'];
+const SC=['#3B82F6','#EF4444','#F59E0B']; // 1획=파랑, 2획=빨강, 3획=주황
 const CVS2=2;
 const gridEl=document.getElementById('grid');
 const cells=[];
