@@ -134,7 +134,7 @@ body {
 /* ── 토스트 ── */
 #toast {
   position: absolute;
-  left:  74.63vw;   /* 격자 중앙 */
+  left:  74.63vw;
   top:   20.00vh;
   transform: translateX(-50%);
   padding: 0.6vh 1.5vw;
@@ -148,6 +148,61 @@ body {
 .t-ok   { background:#10B981; color:#fff; }
 .t-ng   { background:#EF4444; color:#fff; }
 .t-info { background:rgba(255,255,255,.95); color:#333; border:1.5px solid #ddd; }
+
+/* ── 정확도 결과 팝업 ── */
+#score-popup {
+  position: absolute;
+  left: 74.63vw; top: 50vh;
+  transform: translate(-50%, -50%);
+  background: white;
+  border-radius: 1.5vw;
+  padding: 1.8vh 2.2vw;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .3s, transform .3s;
+  z-index: 400;
+  min-width: 14vw;
+}
+#score-popup.show {
+  opacity: 1;
+  pointer-events: all;
+}
+#score-ring {
+  position: relative;
+  width: 7vw; height: 7vw;
+  margin: 0 auto 0.8vh;
+}
+#score-ring svg {
+  width: 100%; height: 100%;
+  transform: rotate(-90deg);
+}
+#score-ring .track { fill: none; stroke: #e8e8e8; stroke-width: 8; }
+#score-ring .fill  { fill: none; stroke-width: 8;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1s ease; }
+#score-num {
+  position: absolute;
+  inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.8vw; font-weight: 900;
+}
+#score-label {
+  font-size: 1.0vw; font-weight: 800; margin-bottom: 0.4vh;
+}
+#score-detail {
+  font-size: 0.75vw; color: #666; line-height: 1.5;
+  margin-bottom: 0.8vh;
+}
+#score-close {
+  padding: 0.4vh 1.2vw;
+  background: #6366F1; color: white;
+  border: none; border-radius: 2vw;
+  font-size: 0.8vw; font-weight: 800;
+  cursor: pointer;
+}
+#score-close:hover { opacity: 0.85; }
 </style>
 </head>
 <body>
@@ -164,6 +219,23 @@ body {
 
   <div id="grid"></div>
   <div id="toast"></div>
+
+  <!-- 정확도 결과 팝업 -->
+  <div id="score-popup">
+    <div id="score-ring">
+      <svg viewBox="0 0 60 60">
+        <circle class="track" cx="30" cy="30" r="24"/>
+        <circle class="fill"  cx="30" cy="30" r="24"
+          id="score-arc"
+          stroke-dasharray="150.8"
+          stroke-dashoffset="150.8"/>
+      </svg>
+      <div id="score-num">0%</div>
+    </div>
+    <div id="score-label">あ 정확도</div>
+    <div id="score-detail"></div>
+    <button id="score-close">확인</button>
+  </div>
 </div>
 
 <script>
@@ -282,6 +354,101 @@ function redraw(c){
 }
 
 /* ══════════════════════════════
+   あ 레퍼런스 획 경로 (Klee One 기준, 정규화 0~1)
+══════════════════════════════ */
+const REF_STROKES = [
+  [[0.20,0.31],[0.28,0.29],[0.38,0.28],[0.50,0.28],[0.60,0.29],[0.68,0.31]],
+  [[0.47,0.20],[0.45,0.30],[0.43,0.40],[0.38,0.52],[0.32,0.62],[0.26,0.72],[0.22,0.78]],
+  [[0.56,0.32],[0.66,0.38],[0.72,0.50],[0.70,0.63],[0.60,0.73],[0.46,0.77],
+   [0.32,0.72],[0.25,0.60],[0.26,0.47],[0.34,0.38],[0.46,0.34],[0.58,0.38],
+   [0.66,0.48],[0.64,0.60]]
+];
+
+function drawRefToCtx(ctx, W, H, strokeIdx) {
+  const lw = Math.max(3, W * 0.065);
+  ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.lineWidth = lw; ctx.strokeStyle='#000';
+  const pts = REF_STROKES[strokeIdx].map(([x,y])=>({x:x*W,y:y*H}));
+  ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
+  for(let i=1;i<pts.length-1;i++){
+    const mx=(pts[i].x+pts[i+1].x)/2,my=(pts[i].y+pts[i+1].y)/2;
+    ctx.quadraticCurveTo(pts[i].x,pts[i].y,mx,my);
+  }
+  ctx.lineTo(pts[pts.length-1].x,pts[pts.length-1].y);
+  ctx.stroke();
+}
+
+function drawStuToCtx(ctx, W, H, pts) {
+  const lw = Math.max(3, W * 0.065);
+  ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.lineWidth = lw; ctx.strokeStyle='#000';
+  ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
+  for(let i=1;i<pts.length-1;i++){
+    const mx=(pts[i].x+pts[i+1].x)/2,my=(pts[i].y+pts[i+1].y)/2;
+    ctx.quadraticCurveTo(pts[i].x,pts[i].y,mx,my);
+  }
+  ctx.lineTo(pts[pts.length-1].x,pts[pts.length-1].y);
+  ctx.stroke();
+}
+
+function pixelIoU(dataA, dataB, size) {
+  let inter=0, union=0;
+  for(let i=3;i<size*4;i+=4){
+    const a=dataA[i]>30?1:0, b=dataB[i]>30?1:0;
+    if(a&&b) inter++;
+    if(a||b) union++;
+  }
+  return union===0?0:inter/union;
+}
+
+function calcAccuracy(strokes, W, H) {
+  if(strokes.length!==3) return null;
+  const size = W*H;
+  const scores = strokes.map((pts, i)=>{
+    const ocR=document.createElement('canvas'); ocR.width=W; ocR.height=H;
+    const ocS=document.createElement('canvas'); ocS.width=W; ocS.height=H;
+    drawRefToCtx(ocR.getContext('2d'),W,H,i);
+    drawStuToCtx(ocS.getContext('2d'),W,H,pts);
+    return pixelIoU(
+      ocR.getContext('2d').getImageData(0,0,W,H).data,
+      ocS.getContext('2d').getImageData(0,0,W,H).data,
+      size
+    );
+  });
+  // 획별 가중치: 1획 20%, 2획 20%, 3획 60%
+  const w = scores[0]*0.20 + scores[1]*0.20 + scores[2]*0.60;
+  // IoU→점수 변환 (필기 관대하게)
+  const pct = Math.min(100, Math.round(w * 300));
+  return {
+    pct,
+    s: scores.map(s=>Math.min(100,Math.round(s*300))),
+    grade: pct>=85?'완벽해요! 🌟':pct>=70?'잘 썼어요! 👍':pct>=50?'조금만 더! 💪':'다시 도전! 🔄'
+  };
+}
+
+function showScorePopup(result) {
+  const popup=document.getElementById('score-popup');
+  const arc  =document.getElementById('score-arc');
+  const num  =document.getElementById('score-num');
+  const lbl  =document.getElementById('score-label');
+  const det  =document.getElementById('score-detail');
+  const C=150.8;
+  const color=result.pct>=85?'#10B981':result.pct>=70?'#3B82F6':result.pct>=50?'#F59E0B':'#EF4444';
+  arc.style.stroke=color;
+  arc.style.strokeDashoffset=C;
+  num.textContent=result.pct+'%'; num.style.color=color;
+  lbl.textContent=result.grade;
+  det.innerHTML=`1획&nbsp;${result.s[0]}점 &nbsp;·&nbsp; 2획&nbsp;${result.s[1]}점 &nbsp;·&nbsp; 3획&nbsp;${result.s[2]}점`;
+  popup.classList.add('show');
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    arc.style.strokeDashoffset=C*(1-result.pct/100);
+  }));
+}
+document.getElementById('score-close').addEventListener('click',()=>{
+  document.getElementById('score-popup').classList.remove('show');
+});
+
+/* ══════════════════════════════
    Klee One あ 획 판정
 ══════════════════════════════ */
 function judgeStroke(idx,pts,W,H){
@@ -379,9 +546,14 @@ cells.forEach((c,idx)=>{
         toast(`${sIdx+1}획 완료 ✓  다음: ${sIdx+2}획`,'info',1000);
       } else {
         c.done=true; c.el.classList.remove('active');
-        toast('🎉 あ 완성!','ok',2200);
+        toast('🎉 あ 완성! 정확도 계산 중…','ok',1500);
+        // 정확도 계산 (약간 딜레이로 toast 먼저 보임)
+        setTimeout(()=>{
+          const acc = calcAccuracy(c.strokes, c.W, c.H);
+          if(acc) showScorePopup(acc);
+        }, 400);
         const nxt=cells.findIndex((cc,i)=>i>idx&&!cc.done);
-        if(nxt!==-1) setTimeout(()=>activate(nxt),700);
+        if(nxt!==-1) setTimeout(()=>activate(nxt),2800);
       }
     }
   }
