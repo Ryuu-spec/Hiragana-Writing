@@ -192,8 +192,7 @@ body {
   font-size: 1.0vw; font-weight: 800; margin-bottom: 0.4vh;
 }
 #score-detail {
-  font-size: 0.75vw; color: #666; line-height: 1.5;
-  margin-bottom: 0.8vh;
+  display: none;
 }
 #score-close {
   padding: 0.4vh 1.2vw;
@@ -364,37 +363,42 @@ const REF_STROKES = [
    [0.66,0.48],[0.64,0.60]]
 ];
 
-function drawRefToCtx(ctx, W, H, strokeIdx) {
-  const lw = Math.max(3, W * 0.065);
+/* 오프스크린 캔버스에 획 그리기 (공통) */
+function drawPathToCanvas(oc, W, H, pts, isRef) {
+  const ctx = oc.getContext('2d');
+  const lw  = Math.max(4, W * 0.09); // 두껍게 → 겹침 관대
+  ctx.clearRect(0,0,W,H);
   ctx.lineCap='round'; ctx.lineJoin='round';
-  ctx.lineWidth = lw; ctx.strokeStyle='#000';
-  const pts = REF_STROKES[strokeIdx].map(([x,y])=>({x:x*W,y:y*H}));
-  ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
-  for(let i=1;i<pts.length-1;i++){
-    const mx=(pts[i].x+pts[i+1].x)/2,my=(pts[i].y+pts[i+1].y)/2;
-    ctx.quadraticCurveTo(pts[i].x,pts[i].y,mx,my);
+  ctx.lineWidth=lw; ctx.strokeStyle='#000';
+  ctx.beginPath();
+  if(isRef){
+    // 레퍼런스: 정규화 좌표 → 픽셀
+    const p0=[pts[0][0]*W, pts[0][1]*H];
+    ctx.moveTo(p0[0],p0[1]);
+    for(let i=1;i<pts.length-1;i++){
+      const mx=(pts[i][0]+pts[i+1][0])/2*W;
+      const my=(pts[i][1]+pts[i+1][1])/2*H;
+      ctx.quadraticCurveTo(pts[i][0]*W,pts[i][1]*H,mx,my);
+    }
+    ctx.lineTo(pts[pts.length-1][0]*W, pts[pts.length-1][1]*H);
+  } else {
+    // 학생: 이미 W/H 픽셀 좌표
+    ctx.moveTo(pts[0].x,pts[0].y);
+    for(let i=1;i<pts.length-1;i++){
+      const mx=(pts[i].x+pts[i+1].x)/2;
+      const my=(pts[i].y+pts[i+1].y)/2;
+      ctx.quadraticCurveTo(pts[i].x,pts[i].y,mx,my);
+    }
+    ctx.lineTo(pts[pts.length-1].x,pts[pts.length-1].y);
   }
-  ctx.lineTo(pts[pts.length-1].x,pts[pts.length-1].y);
   ctx.stroke();
+  return ctx.getImageData(0,0,W,H).data; // 한 번만 호출!
 }
 
-function drawStuToCtx(ctx, W, H, pts) {
-  const lw = Math.max(3, W * 0.065);
-  ctx.lineCap='round'; ctx.lineJoin='round';
-  ctx.lineWidth = lw; ctx.strokeStyle='#000';
-  ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
-  for(let i=1;i<pts.length-1;i++){
-    const mx=(pts[i].x+pts[i+1].x)/2,my=(pts[i].y+pts[i+1].y)/2;
-    ctx.quadraticCurveTo(pts[i].x,pts[i].y,mx,my);
-  }
-  ctx.lineTo(pts[pts.length-1].x,pts[pts.length-1].y);
-  ctx.stroke();
-}
-
-function pixelIoU(dataA, dataB, size) {
+function pixelIoU(dataA, dataB, total) {
   let inter=0, union=0;
-  for(let i=3;i<size*4;i+=4){
-    const a=dataA[i]>30?1:0, b=dataB[i]>30?1:0;
+  for(let i=3; i<total*4; i+=4){
+    const a=dataA[i]>20?1:0, b=dataB[i]>20?1:0;
     if(a&&b) inter++;
     if(a||b) union++;
   }
@@ -403,25 +407,58 @@ function pixelIoU(dataA, dataB, size) {
 
 function calcAccuracy(strokes, W, H) {
   if(strokes.length!==3) return null;
-  const size = W*H;
-  const scores = strokes.map((pts, i)=>{
-    const ocR=document.createElement('canvas'); ocR.width=W; ocR.height=H;
-    const ocS=document.createElement('canvas'); ocS.width=W; ocS.height=H;
-    drawRefToCtx(ocR.getContext('2d'),W,H,i);
-    drawStuToCtx(ocS.getContext('2d'),W,H,pts);
-    return pixelIoU(
-      ocR.getContext('2d').getImageData(0,0,W,H).data,
-      ocS.getContext('2d').getImageData(0,0,W,H).data,
-      size
-    );
+  const total = W*H;
+
+  // 3획을 모두 합쳐서 글자 전체 모양 비교
+  // 레퍼런스: 3획 전체를 하나의 캔버스에
+  const ocR = document.createElement('canvas'); ocR.width=W; ocR.height=H;
+  const ctxR = ocR.getContext('2d');
+  const lwR = Math.max(4, W*0.09);
+  ctxR.lineCap='round'; ctxR.lineJoin='round';
+  ctxR.lineWidth=lwR; ctxR.strokeStyle='#000';
+
+  REF_STROKES.forEach(refPts=>{
+    ctxR.beginPath();
+    ctxR.moveTo(refPts[0][0]*W, refPts[0][1]*H);
+    for(let i=1;i<refPts.length-1;i++){
+      const mx=(refPts[i][0]+refPts[i+1][0])/2*W;
+      const my=(refPts[i][1]+refPts[i+1][1])/2*H;
+      ctxR.quadraticCurveTo(refPts[i][0]*W,refPts[i][1]*H,mx,my);
+    }
+    ctxR.lineTo(refPts[refPts.length-1][0]*W,refPts[refPts.length-1][1]*H);
+    ctxR.stroke();
   });
-  // 획별 가중치: 1획 20%, 2획 20%, 3획 60%
-  const w = scores[0]*0.20 + scores[1]*0.20 + scores[2]*0.60;
-  // IoU→점수 변환 (필기 관대하게)
-  const pct = Math.min(100, Math.round(w * 300));
+  const refData = ctxR.getImageData(0,0,W,H).data;
+
+  // 학생: 3획 전체를 하나의 캔버스에
+  const ocS = document.createElement('canvas'); ocS.width=W; ocS.height=H;
+  const ctxS = ocS.getContext('2d');
+  const lwS = Math.max(4, W*0.09);
+  ctxS.lineCap='round'; ctxS.lineJoin='round';
+  ctxS.lineWidth=lwS; ctxS.strokeStyle='#000';
+
+  strokes.forEach(pts=>{
+    ctxS.beginPath();
+    ctxS.moveTo(pts[0].x,pts[0].y);
+    for(let i=1;i<pts.length-1;i++){
+      const mx=(pts[i].x+pts[i+1].x)/2;
+      const my=(pts[i].y+pts[i+1].y)/2;
+      ctxS.quadraticCurveTo(pts[i].x,pts[i].y,mx,my);
+    }
+    ctxS.lineTo(pts[pts.length-1].x,pts[pts.length-1].y);
+    ctxS.stroke();
+  });
+  const stuData = ctxS.getImageData(0,0,W,H).data;
+
+  const iou = pixelIoU(refData, stuData, total);
+
+  // IoU → 퍼센트 변환
+  // 실측 보정: 잘 쓴 필기의 IoU는 보통 0.25~0.45 범위
+  // IoU 0.20 → 60점, 0.35 → 85점, 0.45+ → 100점
+  const pct = Math.min(100, Math.max(0, Math.round((iou - 0.08) / 0.37 * 100)));
+
   return {
     pct,
-    s: scores.map(s=>Math.min(100,Math.round(s*300))),
     grade: pct>=85?'완벽해요! 🌟':pct>=70?'잘 썼어요! 👍':pct>=50?'조금만 더! 💪':'다시 도전! 🔄'
   };
 }
@@ -438,7 +475,7 @@ function showScorePopup(result) {
   arc.style.strokeDashoffset=C;
   num.textContent=result.pct+'%'; num.style.color=color;
   lbl.textContent=result.grade;
-  det.innerHTML=`1획&nbsp;${result.s[0]}점 &nbsp;·&nbsp; 2획&nbsp;${result.s[1]}점 &nbsp;·&nbsp; 3획&nbsp;${result.s[2]}점`;
+  det.innerHTML=''; // 획별 점수 없음
   popup.classList.add('show');
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
     arc.style.strokeDashoffset=C*(1-result.pct/100);
