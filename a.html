@@ -21,8 +21,8 @@ body {
 /* ══ 상단바 ══ */
 #topbar {
   position:absolute;
-  left:52.5618vw; top:23.1938vh;
-  width:43.0212vw; height:3.8vh;
+  left:53.0172vw; top:23.8784vh;
+  width:41.9828vw; height:3.8vh;
   display:flex; align-items:center; gap:0.5vw;
   pointer-events:none;
 }
@@ -52,12 +52,12 @@ body {
 /* ══ 격자 ══ */
 #grid {
   position:absolute;
-  left:52.5618vw; top:28.5271vh;
-  width:43.0212vw; height:59.8450vh;
+  left:53.0172vw; top:29.2117vh;
+  width:41.9828vw; height:59.5054vh;
   pointer-events:none;
   display:grid;
-  grid-template-columns: 8.2597vw 8.7898vw 8.8560vw 8.8560vw 8.2597vw;
-  grid-template-rows:    14.5736vh 15.3488vh 15.3488vh 14.5736vh;
+  grid-template-columns: 8.0603vw 8.5776vw 8.6422vw 8.6422vw 8.0603vw;
+  grid-template-rows:    14.4900vh 15.3400vh 15.3014vh 14.3740vh;
 }
 .cell {
   position:relative;
@@ -113,12 +113,6 @@ body {
   opacity:1; pointer-events:all;
   transform:translate(-50%,-52%) scale(1);
 }
-#grade-badge {
-  display:inline-block;
-  padding:0.3vh 1.1vw; border-radius:2vw;
-  font-size:1.0vw; font-weight:900; color:#fff;
-  margin-bottom:0.6vh; letter-spacing:.06em;
-}
 #score-ring {
   position:relative; width:6vw; height:6vw; margin:0 auto 0.5vh;
 }
@@ -138,22 +132,6 @@ body {
   background:#f8f9fa; border-radius:0.7vw;
   border-left:3px solid #6366F1;
 }
-/* 컬렉션 카드 */
-#card-reveal { display:none; flex-direction:column; align-items:center; margin-bottom:0.7vh; }
-#card-reveal.show { display:flex; }
-.ccard {
-  width:4.5vw; height:6.3vw; border-radius:0.8vw;
-  background:linear-gradient(135deg,#667eea,#764ba2);
-  display:flex; flex-direction:column;
-  align-items:center; justify-content:center;
-  box-shadow:0 6px 20px rgba(102,126,234,.4);
-  animation:cardPop .5s cubic-bezier(.34,1.56,.64,1) forwards;
-}
-@keyframes cardPop{from{transform:scale(.6) rotate(-8deg);opacity:0;}to{transform:scale(1) rotate(0);opacity:1;}}
-.ccard-char  { font-size:2.2vw; color:#fff; margin-bottom:.2vh; }
-.ccard-label { font-size:0.55vw; color:rgba(255,255,255,.8); letter-spacing:.1em; }
-.ccard-grade { font-size:0.65vw; font-weight:900; color:#FFD700; margin-top:.15vh; }
-#card-caption { font-size:0.6vw; color:#999; margin-top:.35vh; }
 #score-close {
   padding:.35vh 1.3vw; background:#6366F1; color:#fff;
   border:none; border-radius:2vw;
@@ -192,7 +170,6 @@ body {
   <div id="toast"></div>
 
   <div id="score-popup">
-    <div id="grade-badge"></div>
     <div id="score-ring">
       <svg viewBox="0 0 60 60">
         <circle class="track" cx="30" cy="30" r="24"/>
@@ -202,14 +179,6 @@ body {
       <div id="score-num">0%</div>
     </div>
     <div id="analysis-text"></div>
-    <div id="card-reveal">
-      <div class="ccard">
-        <div class="ccard-char">あ</div>
-        <div class="ccard-label">HIRAGANA</div>
-        <div class="ccard-grade" id="card-grade-txt"></div>
-      </div>
-      <div id="card-caption">✨ 컬렉션 카드 획득!</div>
-    </div>
     <button id="score-close">확인 →</button>
   </div>
 </div>
@@ -218,18 +187,11 @@ body {
 /* ══ 펜 상태 (고정) ══ */
 const PEN = {lw:.028, opacity:1.0, texture:false};
 let curPen='g';
-const curColor='#3B82F6';
+const curColor='#3B82F6'; // 기본색 (사용 안 함 - SC로 대체)
 const curThickness=2.5;
 
 /* ══ 등급 ══ */
-const GRADES=[
-  {min:90,id:'S',label:'S 레벨 — 장인 ⚡',  card:'S CLASS', color:'#7C3AED',ring:'#8B5CF6'},
-  {min:75,id:'A',label:'A 레벨 — 고수 🎯',  card:'A CLASS', color:'#1D4ED8',ring:'#3B82F6'},
-  {min:60,id:'B',label:'B 레벨 — 수련 중 💪',card:'B CLASS',color:'#047857',ring:'#10B981'},
-  {min:40,id:'C',label:'C 레벨 — 입문 🌱',  card:'C CLASS', color:'#B45309',ring:'#F59E0B'},
-  {min:0, id:'D',label:'D 레벨 — 다시 도전 🔄',card:'RETRY',color:'#B91C1C',ring:'#EF4444'},
-];
-const getGrade=pct=>GRADES.find(g=>pct>=g.min);
+const RING_COLOR=pct=>pct>=75?'#10B981':pct>=50?'#F59E0B':'#EF4444';
 
 /* ══ 실시간 문구 ══ */
 const MSGS={
@@ -429,14 +391,12 @@ function calcAccuracy(strokes,W,H){
 
 /* ══ 결과 팝업 ══ */
 function showResult(pct,allMsgs,cellEl){
-  const g=getGrade(pct);
   const C=150.8;
-  document.getElementById('grade-badge').textContent=g.label;
-  document.getElementById('grade-badge').style.background=g.color;
+  const color=RING_COLOR(pct);
   const arc=document.getElementById('score-arc');
-  arc.style.stroke=g.ring; arc.style.strokeDashoffset=C;
+  arc.style.stroke=color; arc.style.strokeDashoffset=C;
   const num=document.getElementById('score-num');
-  num.textContent=pct+'%'; num.style.color=g.ring;
+  num.textContent=pct+'%'; num.style.color=color;
 
   // 분석 피드백
   const at=document.getElementById('analysis-text');
@@ -446,15 +406,6 @@ function showResult(pct,allMsgs,cellEl){
   } else {
     at.innerHTML='✅ 획순과 위치 모두 완벽해요!';
     at.style.display='block';
-  }
-
-  // 컬렉션 카드 (B 이상)
-  const cr=document.getElementById('card-reveal');
-  if(pct>=60){
-    document.getElementById('card-grade-txt').textContent=g.card;
-    cr.classList.add('show');
-  } else {
-    cr.classList.remove('show');
   }
 
   const popup=document.getElementById('score-popup');
@@ -494,7 +445,7 @@ cells.forEach((c,idx)=>{
     if(!c.drawing)return;
     c.pts.push(evPt(e,c));
     redraw(c);
-    drawCurve(c.ctx,c.pts,curColor,c.W,curPen,curThickness);
+    drawCurve(c.ctx,c.pts,SC[c.strokes.length],c.W,curPen,curThickness);
   },{passive:false});
 
   function onEnd(e){
@@ -503,9 +454,9 @@ cells.forEach((c,idx)=>{
     c.drawing=false;
     if(c.pts.length<4){c.pts=[];return;}
     const si=c.strokes.length;
+    const strokeColor=SC[si]; // 획순별 고정 색상
     const res=analyzeStroke(si,c.pts,c.W,c.H);
-    // 획 저장: 색상/펜/굵기 함께
-    c.strokes.push({pts:[...c.pts], color:curColor, pen:curPen, thick:curThickness});
+    c.strokes.push({pts:[...c.pts], color:strokeColor, pen:curPen, thick:curThickness});
     c.pts=[];
     redraw(c);syncDots(c.strokes.length);
 
@@ -520,7 +471,7 @@ cells.forEach((c,idx)=>{
       showStrokePop(c.el,'try');
       toast(res.msgs[0],'ng',2500);
     } else {
-      bdg.textContent=`${si+1}✓`;bdg.style.color=curColor;
+      bdg.textContent=`${si+1}✓`;bdg.style.color=strokeColor;
       c.el.appendChild(bdg);
       showStrokePop(c.el,res.quality);
       if(res.msgs.length>0)toast('💡 '+res.msgs[0],'info',1800);
